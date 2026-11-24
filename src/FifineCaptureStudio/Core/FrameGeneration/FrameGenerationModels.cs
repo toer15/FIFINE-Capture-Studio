@@ -59,6 +59,23 @@ public sealed class FrameGenerationSettings
     };
 }
 
+/// <summary>
+/// A GPU-resident output surface from the enhancement engine. The handle remains valid while the
+/// engine is alive; the presenter opens it on its own D3D11 device and never reads it back to CPU.
+/// </summary>
+public sealed record GpuScheduledFrame(
+    IntPtr SharedTextureHandle,
+    int Width,
+    int Height,
+    long DueTicks,
+    bool Generated,
+    long SourceSequence,
+    long SourceArrivalTicks)
+{
+    public double DueMs(long nowTicks) =>
+        (DueTicks - nowTicks) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+}
+
 /// <summary>One frame on the presenter timeline. DueTicks uses Stopwatch timestamps.</summary>
 public sealed class ScheduledFrame
 {

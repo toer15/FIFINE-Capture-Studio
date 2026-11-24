@@ -2230,6 +2230,7 @@ public sealed partial class StudioViewModel : ObservableObject
     {
         _uiTimer.Stop();
         System.Windows.Media.CompositionTarget.Rendering -= OnCompositionRendering;
+        StopNativePresenter();
         await _services.Session.StopAsync();
     }
 }

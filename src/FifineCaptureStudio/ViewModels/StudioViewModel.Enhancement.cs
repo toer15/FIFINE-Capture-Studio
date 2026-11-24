@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Enhancement;
+using FifineCaptureStudio.Core.FrameGeneration;
 
 namespace FifineCaptureStudio.ViewModels;
 
@@ -63,6 +65,11 @@ public sealed partial class StudioViewModel
         {
             if (Config.Enhancement.Enabled == value) return;
             Config.Enhancement.Enabled = value;
+            if (!value && NativePresenterActive)
+            {
+                StopNativePresenter();
+            }
+
             SaveEnhancement();
             // The preview size is baked into the FFmpeg arguments: enabling enhancement must rebuild
             // the pipeline so native frames reach the engine instead of the light 1600 px stream.
@@ -230,7 +237,17 @@ public sealed partial class StudioViewModel
     public bool FullscreenEnhanced
     {
         get => Config.Enhancement.FullscreenEnhanced;
-        set { Config.Enhancement.FullscreenEnhanced = value; SaveEnhancement(); }
+        set
+        {
+            if (Config.Enhancement.FullscreenEnhanced == value) return;
+            Config.Enhancement.FullscreenEnhanced = value;
+            if (!value && NativePresenterActive)
+            {
+                StopNativePresenter();
+            }
+
+            SaveEnhancement();
+        }
     }
 
     public double EnhancementDetail
@@ -475,6 +492,12 @@ public sealed partial class StudioViewModel
         {
             var w = _services.Session.ActiveSourceWidth;
             var h = _services.Session.ActiveSourceHeight;
+            if (_services.Enhancement.TargetFallbackActive
+                && Config.Enhancement.Target == SuperResolutionTarget.P2160)
+            {
+                return "2560 × 1440 (4K performance fallback)";
+            }
+
             var (tw, th) = EnhancementConfig.Resolution(Config.Enhancement.Target);
             if (tw > 0)
             {
@@ -485,8 +508,9 @@ public sealed partial class StudioViewModel
         }
     }
 
-    public string EnhancementOutputNote =>
-        "Enhanced output is reconstructed from the incoming video. It does not add native detail that the console never sent.";
+    public string EnhancementOutputNote => _services.Enhancement.TargetFallbackActive
+        ? _services.Enhancement.TargetFallbackNote
+        : "Enhanced output is reconstructed from the incoming video. It does not add native detail that the console never sent.";
 
     // ------------------------------------------------------------------ commands
 
@@ -621,6 +645,8 @@ public sealed partial class StudioViewModel
         Raise(nameof(EnhancementOutputResolutionText));
         Raise(nameof(EnhancementInputResolutionText));
         Raise(nameof(EnhancementInputNote));
+        Raise(nameof(EnhancementOutputResolutionText));
+        Raise(nameof(EnhancementOutputNote));
         Raise(nameof(EnhancementSourceFpsText));
         Raise(nameof(EnhancementProcessedFpsText));
         Raise(nameof(EnhancementPresentedFpsText));
@@ -675,10 +701,36 @@ public sealed partial class StudioViewModel
                     continue;
                 }
 
+                var presenter = _nativePresenter;
+                var directGpu = presenter is not null
+                                && !Config.FrameGeneration.Enabled
+                                && Config.Enhancement.Enabled
+                                && Config.Enhancement.FullscreenEnhanced;
+
                 EnhancedFrame? result = null;
+                EnhancedGpuFrame? gpu = null;
                 try
                 {
-                    result = _services.Enhancement.Process(item.Image, item.Arrival);
+                    if (directGpu)
+                    {
+                        gpu = _services.Enhancement.ProcessShared(item.Image, item.Arrival, Stopwatch.GetTimestamp());
+                        if (gpu is not null)
+                        {
+                            presenter!.EnqueueGpu(new GpuScheduledFrame(
+                                gpu.SharedHandle,
+                                gpu.OutputWidth,
+                                gpu.OutputHeight,
+                                Stopwatch.GetTimestamp(),
+                                false,
+                                gpu.SourceSequence,
+                                gpu.ArrivalTicks));
+                        }
+                    }
+
+                    if (gpu is null)
+                    {
+                        result = _services.Enhancement.Process(item.Image, item.Arrival);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -686,13 +738,14 @@ public sealed partial class StudioViewModel
                 }
 
                 // Feed the frame-generation pipeline from the pre-presentation thread. Recordings
-                // never see these frames; only the native presenter does.
+                // never see these frames; only the native presenter does. The direct-GPU path does
+                // not need the CPU pixels and therefore never calls this fallback.
                 if (result is not null)
                 {
                     SubmitFrameForGeneration(result.Pixels, result.OutputWidth, result.OutputHeight,
                         item.Arrival.Sequence, item.Arrival.ArrivalTicks);
                 }
-                else
+                else if (gpu is null)
                 {
                     SubmitBitmapForGeneration(item.Image, item.Arrival.Sequence, item.Arrival.ArrivalTicks);
                 }
@@ -700,10 +753,10 @@ public sealed partial class StudioViewModel
                 _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
                 {
                     _framePending = 0;
-                    var presented = result is not null;
-                    if (presented)
+                    var presented = result is not null || gpu is not null;
+                    if (result is not null)
                     {
-                        _enhancedPreviewImage = result!.ToBitmap();
+                        _enhancedPreviewImage = result.ToBitmap();
                         if (!ShowOriginal)
                         {
                             PreviewImage = _enhancedPreviewImage;
@@ -711,6 +764,10 @@ public sealed partial class StudioViewModel
                     }
                     else if (!ShowOriginal)
                     {
+                        // In direct-GPU mode the enhanced result never returns to CPU. Keep the main
+                        // WPF window as the unmodified compatibility preview instead of paying for a
+                        // readback that the native presenter explicitly avoids.
+                        _enhancedPreviewImage = item.Image;
                         PreviewImage = item.Image;
                     }
 

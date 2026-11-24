@@ -215,16 +215,16 @@ public partial class MainWindow : Window
 
     private async void ToggleFullScreen()
     {
-        if (ViewModel.FrameGenerationActive)
+        if (ViewModel.NativePresenterActive)
         {
             ViewModel.StopNativePresenter();
             return;
         }
 
-        if (ViewModel.FrameGenerationEnabled)
+        if (ViewModel.CanOpenNativePresenter)
         {
             var owner = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (await ViewModel.StartFrameGenerationPresenterAsync(owner))
+            if (await ViewModel.StartNativePresenterAsync(owner))
             {
                 return;
             }

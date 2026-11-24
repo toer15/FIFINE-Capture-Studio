@@ -166,6 +166,21 @@ public readonly record struct EnhancementTimings(
     public double TotalMs => GpuMs + ReadbackWaitMs;
 }
 
+/// <summary>
+/// Output retained entirely in GPU memory. SharedHandle belongs to the enhancement engine's
+/// persistent shared texture; the native presenter opens it instead of receiving a CPU bitmap.
+/// </summary>
+public sealed record EnhancedGpuFrame(
+    IntPtr SharedHandle,
+    int SourceWidth,
+    int SourceHeight,
+    int OutputWidth,
+    int OutputHeight,
+    long SourceSequence,
+    long ArrivalTicks,
+    long DueTicks,
+    EnhancementTimings Timings);
+
 public sealed record EnhancedFrame(
     byte[] Pixels,
     int Stride,

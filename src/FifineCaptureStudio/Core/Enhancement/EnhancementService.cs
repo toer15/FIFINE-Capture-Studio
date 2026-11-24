@@ -53,6 +53,9 @@ public sealed class EnhancementService : IDisposable
     private int _lastOutputHeight;
     private readonly List<double> _presentSamples = new(LatencySampleCapacity);
     private readonly List<double> _totalSamples = new(LatencySampleCapacity);
+    private readonly List<double> _targetSamples = new(LatencySampleCapacity);
+    private SuperResolutionTarget _sampleTarget = SuperResolutionTarget.Native;
+    private volatile bool _use4KFallback;
 
     public EnhancementService(SettingsService settings)
     {
@@ -86,6 +89,20 @@ public sealed class EnhancementService : IDisposable
     public int LastOutputHeight => _lastOutputHeight;
 
     public EnhancementConfig Config => _settings.Current.Enhancement.ToConfig();
+
+    /// <summary>
+    /// True when the requested 4K target exceeded the 60 FPS total-duration budget in measured
+    /// frames. The persisted choice stays 4K; only the runtime effective target falls back to 1440p
+    /// so the user can see what happened and choose a different preset deliberately.
+    /// </summary>
+    public bool TargetFallbackActive => _use4KFallback;
+
+    public string TargetFallbackNote => _use4KFallback
+        ? "4K P95 exceeded 16.67 ms · runtime output is 2560 × 1440 until the target changes."
+        : string.Empty;
+
+    public static bool Needs4KFallback(SuperResolutionTarget target, double p95Ms, int sampleCount) =>
+        target == SuperResolutionTarget.P2160 && sampleCount >= 60 && p95Ms > 16.67;
 
     public bool ShouldEnhancePreview => Available
                                         && _settings.Current.Enhancement.Enabled
@@ -171,7 +188,7 @@ public sealed class EnhancementService : IDisposable
         var queueWaitMs = (started - arrival.ArrivalTicks) * 1000.0 / Stopwatch.Frequency;
         try
         {
-            var result = engine.Process(frame, Config);
+            var result = engine.Process(frame, EffectiveConfig(Config));
             if (result is null)
             {
                 return null;
@@ -192,6 +209,45 @@ public sealed class EnhancementService : IDisposable
     /// <summary>Convenience overload for callers that only have a bitmap (tests, tooling).</summary>
     public EnhancedFrame? Process(BitmapSource frame) =>
         Process(frame, new FrameArrival(0, Stopwatch.GetTimestamp(), 0));
+
+    /// <summary>
+    /// Processes a fullscreen frame and leaves the result in GPU memory for the native presenter.
+    /// The WPF preview keeps its own CPU path; this path is deliberately readback-free.
+    /// </summary>
+    public EnhancedGpuFrame? ProcessShared(BitmapSource frame, FrameArrival arrival, long dueTicks)
+    {
+        if (!ShouldEnhanceFullscreen)
+        {
+            return null;
+        }
+
+        var engine = EnsureEngine();
+        if (engine is null)
+        {
+            return null;
+        }
+
+        var started = Stopwatch.GetTimestamp();
+        var queueWaitMs = (started - arrival.ArrivalTicks) * 1000.0 / Stopwatch.Frequency;
+        try
+        {
+            var result = engine.ProcessShared(frame, EffectiveConfig(Config), arrival.Sequence, arrival.ArrivalTicks, dueTicks);
+            if (result is null)
+            {
+                return null;
+            }
+
+            var ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+            RecordSharedFrame(result, ms, queueWaitMs, arrival.DecodeMs, engine);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _status = "Enhancement failed: " + ex.Message;
+            Log.Error("Shared enhancement frame failed", ex);
+            return null;
+        }
+    }
 
     public void NoteDropped() => Interlocked.Increment(ref _dropped);
 
@@ -257,6 +313,63 @@ public sealed class EnhancementService : IDisposable
         }
     }
 
+    private EnhancementConfig EffectiveConfig(EnhancementConfig config) =>
+        _use4KFallback && config.Target == SuperResolutionTarget.P2160
+            ? config with { Target = SuperResolutionTarget.P1440 }
+            : config;
+
+    private void RecordTargetSample(double totalMs)
+    {
+        var requested = Config.Target;
+        if (requested != _sampleTarget)
+        {
+            _targetSamples.Clear();
+            _sampleTarget = requested;
+            _use4KFallback = false;
+        }
+
+        AddSample(_targetSamples, totalMs);
+        if (!_use4KFallback && Needs4KFallback(requested, PercentileCore(_targetSamples, 0.95), _targetSamples.Count))
+        {
+            _use4KFallback = true;
+        }
+    }
+
+    private void RecordSharedFrame(EnhancedGpuFrame result, double totalMs, double queueWaitMs, double decodeMs, EnhancementEngine engine)
+    {
+        lock (_statsGate)
+        {
+            Interlocked.Increment(ref _processed);
+            _fpsFrames++;
+            var now = DateTime.UtcNow;
+            var elapsed = (now - _fpsWindow).TotalSeconds;
+            if (elapsed >= 0.5)
+            {
+                _fps = Math.Round(_fpsFrames / elapsed, 1);
+                _fpsFrames = 0;
+                _fpsWindow = now;
+            }
+
+            _lastInputWidth = result.SourceWidth;
+            _lastInputHeight = result.SourceHeight;
+            _lastOutputWidth = result.OutputWidth;
+            _lastOutputHeight = result.OutputHeight;
+            _avgMs = Ewma(_avgMs, totalMs);
+            _uploadMs = Ewma(_uploadMs, result.Timings.UploadMs);
+            _queueAgeMs = Ewma(_queueAgeMs, Math.Max(0, queueWaitMs));
+            _decodeMs = Ewma(_decodeMs, Math.Max(0, decodeMs));
+            AddSample(_totalSamples, totalMs);
+            RecordTargetSample(totalMs);
+
+            if (++_framesSinceStats >= 30 || (now - _lastVramQuery).TotalSeconds > 2)
+            {
+                _framesSinceStats = 0;
+                _lastVramQuery = now;
+                _vramMb = engine.QueryVramUsedMb();
+            }
+        }
+    }
+
     private void RecordFrame(EnhancedFrame result, double totalMs, double queueWaitMs, double decodeMs, EnhancementEngine engine)
     {
         var timings = result.Timings;
@@ -280,6 +393,7 @@ public sealed class EnhancementService : IDisposable
 
             _avgMs = Ewma(_avgMs, totalMs);
             _uploadMs = Ewma(_uploadMs, timings.UploadMs);
+            RecordTargetSample(totalMs);
             _denoiseMs = Ewma(_denoiseMs, timings.DenoiseMs);
             _gradeMs = Ewma(_gradeMs, timings.ColourMs);
             _upscaleMs = Ewma(_upscaleMs, timings.UpscaleMs);
@@ -328,7 +442,16 @@ public sealed class EnhancementService : IDisposable
 
     public void Reload()
     {
-        // Configuration is pulled per frame; nothing to rebuild unless the engine failed.
+        lock (_statsGate)
+        {
+            var target = Config.Target;
+            if (target != _sampleTarget)
+            {
+                _targetSamples.Clear();
+                _sampleTarget = target;
+                _use4KFallback = false;
+            }
+        }
     }
 
     public void Dispose()

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Enhancement;
@@ -61,12 +62,14 @@ public sealed partial class StudioViewModel
             if (Config.FrameGeneration.Enabled == value) return;
             Config.FrameGeneration.Enabled = value;
             _services.Settings.SaveSoon();
-            if (!value)
+            // The presenter's input path changes when frame generation is enabled or disabled. Close
+            // it rather than leaving a direct-GPU presentation window with no producer.
+            if (_nativePresenter is not null)
             {
                 StopNativePresenter();
-                FrameGenerationBypass = false;
             }
 
+            FrameGenerationBypass = false;
             RaiseAllFrameGeneration();
         }
     }
@@ -121,6 +124,15 @@ public sealed partial class StudioViewModel
     public string FrameGenerationSkippedText => _services.FrameGeneration.SkippedInterpolations.ToString("N0");
 
     public bool FrameGenerationActive => _frameGenerationActive;
+    public bool NativePresenterActive => _nativePresenter is not null;
+
+    /// <summary>
+    /// The native presenter can be used for enhanced source frames even when RIFE is off. It still
+    /// requires the enhancement pipeline and fullscreen enhancement routing to have something to show.
+    /// </summary>
+    public bool CanOpenNativePresenter =>
+        Config.FrameGeneration.Enabled
+        || (Config.Enhancement.Enabled && Config.Enhancement.FullscreenEnhanced);
 
     public bool FrameGenerationModelInstalled => _services.FrameGeneration.ModelInstalled;
 
@@ -294,42 +306,56 @@ public sealed partial class StudioViewModel
         }
     }
 
-    public async Task<bool> StartFrameGenerationPresenterAsync(IntPtr owner)
+    /// <summary>
+    /// Opens the dedicated native presenter. With RIFE enabled this also creates the existing CPU
+    /// frame-generation pipeline; without it the presenter receives the enhancement engine's shared
+    /// GPU texture directly, so the main WPF window keeps its controls and fallback preview but does
+    /// not participate in high-frequency presentation.
+    /// </summary>
+    public async Task<bool> StartNativePresenterAsync(IntPtr owner)
     {
         if (_nativePresenter is not null)
         {
             return true;
         }
 
-        if (!Config.FrameGeneration.Enabled)
+        var useFrameGeneration = Config.FrameGeneration.Enabled;
+        if (!useFrameGeneration && !(Config.Enhancement.Enabled && Config.Enhancement.FullscreenEnhanced))
         {
             return false;
         }
 
         var service = _services.FrameGeneration;
-        if (!service.ModelInstalled)
+        if (useFrameGeneration)
         {
-            Notify("Frame generation needs the RIFE model. Install it on the Gaming Enhancement page first.", true);
-            return false;
+            if (!service.ModelInstalled)
+            {
+                Notify("Frame generation needs the RIFE model. Install it on the Gaming Enhancement page first.", true);
+                return false;
+            }
+
+            var ready = await service.EnsureReadyAsync();
+            if (!ready || service.Engine is null)
+            {
+                Notify(service.Status, true);
+                return false;
+            }
         }
 
-        var ready = await service.EnsureReadyAsync();
-        if (!ready || service.Engine is null)
-        {
-            Notify(service.Status, true);
-            return false;
-        }
-
-        // The presenter must not open on a display that cannot show the generated cadence.
         var refresh = DisplayRefresh.Get(owner, out var monitor);
-        if (refresh < 100)
+        // The presenter itself is valid at 60 Hz; only the generated 2x cadence needs 100 Hz+.
+        if (useFrameGeneration && refresh < 100)
         {
             Notify($"{monitor} runs at {refresh} Hz. A 100 Hz or faster display is required for 2× frame generation.", true);
             return false;
         }
 
-        var engine = service.Engine;
-        var presenter = new NativeFramePresenter(engine.Width, engine.Height, OnPresenterClosed, OnPresenterBypassChanged);
+        var engine = useFrameGeneration ? service.Engine : null;
+        var (width, height) = useFrameGeneration && engine is not null
+            ? (engine.Width, engine.Height)
+            : NativeOutputSize();
+
+        var presenter = new NativeFramePresenter(width, height, OnPresenterClosed, OnPresenterBypassChanged);
         if (!presenter.Start(owner))
         {
             presenter.Dispose();
@@ -339,20 +365,48 @@ public sealed partial class StudioViewModel
 
         _nativePresenter = presenter;
         presenter.UpdateOverlay(BuildFpsOverlaySnapshot());
-        _fgSessionGeneratedStart = service.GeneratedFrames;
-        _fgSessionSourceStart = service.SourceFrames;
-        _fgSessionSkippedStart = service.SkippedInterpolations;
-        _fgSessionReportPending = true;
-        _frameGenerationPipeline = new FrameGenerationPipeline(
-            engine, service, engine.Width, engine.Height, presenter.Enqueue)
+        if (useFrameGeneration && engine is not null)
         {
-            Bypass = _frameGenerationBypass,
-            Latency = Config.FrameGeneration.Latency
-        };
-        _frameGenerationPipeline.Start();
-        _frameGenerationActive = true;
+            _fgSessionGeneratedStart = service.GeneratedFrames;
+            _fgSessionSourceStart = service.SourceFrames;
+            _fgSessionSkippedStart = service.SkippedInterpolations;
+            _fgSessionReportPending = true;
+            _frameGenerationPipeline = new FrameGenerationPipeline(
+                engine, service, engine.Width, engine.Height, presenter.Enqueue)
+            {
+                Bypass = _frameGenerationBypass,
+                Latency = Config.FrameGeneration.Latency
+            };
+            _frameGenerationPipeline.Start();
+        }
+        else
+        {
+            // No interpolation pipeline: the enhancement worker feeds shared GPU textures directly.
+            _frameGenerationPipeline = null;
+            _fgSessionReportPending = false;
+        }
+
+        _frameGenerationActive = useFrameGeneration;
         RaiseAllFrameGeneration();
         return true;
+    }
+
+    public Task<bool> StartFrameGenerationPresenterAsync(IntPtr owner) =>
+        Config.FrameGeneration.Enabled
+            ? StartNativePresenterAsync(owner)
+            : Task.FromResult(false);
+
+    private (int Width, int Height) NativeOutputSize()
+    {
+        var (targetWidth, targetHeight) = Core.Enhancement.EnhancementConfig.Resolution(Config.Enhancement.Target);
+        if (targetWidth > 0 && targetHeight > 0)
+        {
+            return (targetWidth, targetHeight);
+        }
+
+        var width = _services.Session.ActivePreviewWidth;
+        var height = _services.Session.ActivePreviewHeight;
+        return width > 0 && height > 0 ? (width, height) : (1920, 1080);
     }
 
     public void StopNativePresenter()
@@ -365,6 +419,8 @@ public sealed partial class StudioViewModel
         presenter?.Dispose();
         _frameGenerationActive = false;
         _frameGenerationBypass = false;
+        _ = System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            new Action(() => System.Windows.Application.Current?.MainWindow?.Activate()));
         _services.FrameGeneration.SetStatus(_services.FrameGeneration.Ready
             ? "Ready · presenter closed"
             : "Off");
@@ -390,6 +446,8 @@ public sealed partial class StudioViewModel
             : "Off");
         AppendFrameGenerationReport();
         RaiseAllFrameGeneration();
+        _ = System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            new Action(() => System.Windows.Application.Current?.MainWindow?.Activate()));
     });
 
     /// <summary>Adds the pipeline's own counters to the presenter's session report.</summary>
@@ -465,6 +523,7 @@ public sealed partial class StudioViewModel
         Raise(nameof(FrameGenerationSceneCutsText));
         Raise(nameof(FrameGenerationSkippedText));
         Raise(nameof(FrameGenerationActive));
+        Raise(nameof(NativePresenterActive));
         Raise(nameof(FrameGenerationBypass));
         Raise(nameof(FrameGenerationBypassLabel));
         Raise(nameof(FrameGenerationBodyText));

@@ -51,6 +51,20 @@ public class EnhancementSettingsTests
         Assert.Equal(0, settings.Enhancement.OutputFpsTarget);
     }
 
+    [Theory]
+    [InlineData(SuperResolutionTarget.P2160, 18.27, 120, true)]
+    [InlineData(SuperResolutionTarget.P2160, 16.67, 120, false)]
+    [InlineData(SuperResolutionTarget.P2160, 18.27, 59, false)]
+    [InlineData(SuperResolutionTarget.P1440, 18.27, 120, false)]
+    public void Only_a_measured_slow_4k_target_uses_the_fallback(
+        SuperResolutionTarget target,
+        double p95Ms,
+        int samples,
+        bool expected)
+    {
+        Assert.Equal(expected, EnhancementService.Needs4KFallback(target, p95Ms, samples));
+    }
+
     [Fact]
     public void Presets_write_concrete_values()
     {
@@ -250,6 +264,45 @@ public class RecordingFilterTests
 
 public class EnhancementGpuTests
 {
+    [Fact]
+    public void Engine_publishes_a_shared_gpu_output_without_a_cpu_readback()
+    {
+        var primary = GpuDetection.Primary(GpuDetection.Detect());
+        if (primary is null)
+        {
+            return;
+        }
+
+        using var engine = new EnhancementEngine(primary);
+        var pixels = new byte[320 * 180 * 4];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 32;
+            pixels[i + 1] = 128;
+            pixels[i + 2] = 224;
+            pixels[i + 3] = 255;
+        }
+
+        var source = System.Windows.Media.Imaging.BitmapSource.Create(
+            320, 180, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, 320 * 4);
+        source.Freeze();
+
+        var result = engine.ProcessShared(
+            source,
+            new EnhancementConfig { Enabled = true, Target = SuperResolutionTarget.Native },
+            sourceSequence: 7,
+            arrivalTicks: 100,
+            dueTicks: 200);
+
+        Assert.NotNull(result);
+        Assert.NotEqual(IntPtr.Zero, result!.SharedHandle);
+        Assert.Equal(320, result.OutputWidth);
+        Assert.Equal(180, result.OutputHeight);
+        Assert.Equal(7, result.SourceSequence);
+        Assert.Equal(0, result.Timings.ReadbackMs);
+        Assert.Equal(0, result.Timings.ReadbackWaitMs);
+    }
+
     [Fact]
     public void Engine_processes_a_real_frame_on_an_available_adapter()
     {

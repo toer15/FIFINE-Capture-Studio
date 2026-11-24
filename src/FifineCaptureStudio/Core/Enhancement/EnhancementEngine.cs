@@ -44,6 +44,10 @@ public sealed class EnhancementEngine : IDisposable
     private ShaderResourceView? _outputView;
     private UnorderedAccessView? _outputUav;
     private Texture2D? _staging;
+    private SharedSurface[]? _sharedSurfaces;
+    private int _sharedIndex;
+    private int _sharedWidth;
+    private int _sharedHeight;
 
     private Query? _disjoint;
     private Query? _t0;
@@ -188,6 +192,175 @@ public sealed class EnhancementEngine : IDisposable
         }
     }
 
+    /// <summary>
+    /// Runs the same enhancement pipeline but leaves the result in a keyed-mutex shared texture.
+    /// The native presenter opens the handle on its own device, so this path performs no CPU
+    /// readback and allocates no per-frame output texture. Two shared surfaces let the producer
+    /// stay one frame ahead without overwriting the frame currently being copied by the presenter.
+    /// Returns null when the consumer has not released a surface within the short producer budget.
+    /// </summary>
+    public EnhancedGpuFrame? ProcessShared(
+        BitmapSource source,
+        EnhancementConfig config,
+        long sourceSequence,
+        long arrivalTicks,
+        long dueTicks)
+    {
+        if (_disposed || source.PixelWidth < 2 || source.PixelHeight < 2)
+        {
+            return null;
+        }
+
+        lock (_gate)
+        {
+            var (targetWidth, targetHeight) = EnhancementConfig.Resolution(config.Target);
+            var outWidth = (targetWidth > 0 ? targetWidth : source.PixelWidth) & ~1;
+            var outHeight = (targetHeight > 0 ? targetHeight : source.PixelHeight) & ~1;
+            EnsureResources(source.PixelWidth, source.PixelHeight, outWidth, outHeight);
+            EnsureSharedSurfaces(outWidth, outHeight);
+            if (_sharedSurfaces is not { Length: > 0 })
+            {
+                return null;
+            }
+
+            var surface = _sharedSurfaces[_sharedIndex++ % _sharedSurfaces.Length];
+            var upload = Stopwatch.StartNew();
+            Upload(source);
+            var uploadMs = upload.Elapsed.TotalMilliseconds;
+
+            var denoiseAmount = config.Denoise
+                ? Math.Clamp(Math.Max(config.CompressionReduction, 0.15), 0, 1)
+                : 0;
+            var deblock = config.Deblock ? denoiseAmount : 0;
+
+            var acquired = false;
+            try
+            {
+                acquired = surface.Mutex.Acquire(0, 8).Success;
+            }
+            catch
+            {
+                acquired = false;
+            }
+
+            if (!acquired)
+            {
+                // The presenter may have closed with this surface still published at key 1. Recreate
+                // the small shared pool rather than leaving every later frame stuck on a dead lease.
+                ReleaseSharedSurfaces();
+                EnsureSharedSurfaces(outWidth, outHeight);
+                return null;
+            }
+
+            var copied = false;
+            try
+            {
+                _context.ComputeShader.Set(_denoise);
+                SetParams(config, source.PixelWidth, source.PixelHeight, denoiseAmount, deblock);
+                _context.ComputeShader.SetShaderResource(0, _sourceView);
+                _context.ComputeShader.SetUnorderedAccessView(0, _workUav);
+                _context.Dispatch((source.PixelWidth + 7) / 8, (source.PixelHeight + 7) / 8, 1);
+
+                _context.ComputeShader.Set(_grade);
+                SetParams(config, source.PixelWidth, source.PixelHeight, denoiseAmount, deblock);
+                _context.ComputeShader.SetUnorderedAccessView(0, _work2Uav);
+                _context.ComputeShader.SetShaderResource(0, _workView);
+                _context.Dispatch((source.PixelWidth + 7) / 8, (source.PixelHeight + 7) / 8, 1);
+
+                _context.ComputeShader.SetUnorderedAccessView(0, null);
+                _context.ComputeShader.Set(outWidth == source.PixelWidth && outHeight == source.PixelHeight ? _copy : _upscale);
+                SetParams(config, outWidth, outHeight, denoiseAmount, deblock);
+                _context.ComputeShader.SetShaderResource(0, _work2View);
+                _context.ComputeShader.SetUnorderedAccessView(0, _outputUav);
+                _context.Dispatch((outWidth + 7) / 8, (outHeight + 7) / 8, 1);
+                _context.ComputeShader.SetUnorderedAccessView(0, null);
+
+                _context.CopyResource(_output, surface.Texture);
+                _context.Flush();
+                copied = true;
+            }
+            finally
+            {
+                // The presenter waits for key 1 and hands the surface back with key 0. If the copy
+                // failed, return key 0 without publishing a half-written texture.
+                try { surface.Mutex.Release(copied ? 1 : 0); } catch { }
+            }
+
+            return new EnhancedGpuFrame(
+                surface.Handle,
+                source.PixelWidth,
+                source.PixelHeight,
+                outWidth,
+                outHeight,
+                sourceSequence,
+                arrivalTicks,
+                dueTicks,
+                new EnhancementTimings(uploadMs, 0, 0, 0, 0, 0));
+        }
+    }
+
+    private void EnsureSharedSurfaces(int width, int height)
+    {
+        if (_sharedSurfaces is { Length: > 0 } && _sharedWidth == width && _sharedHeight == height)
+        {
+            return;
+        }
+
+        ReleaseSharedSurfaces();
+        var surfaces = new SharedSurface[2];
+        try
+        {
+            for (var i = 0; i < surfaces.Length; i++)
+            {
+                var texture = new Texture2D(_device, new Texture2DDescription
+                {
+                    Width = width,
+                    Height = height,
+                    MipLevels = 1,
+                    ArraySize = 1,
+                    Format = Format.B8G8R8A8_UNorm,
+                    SampleDescription = new SampleDescription(1, 0),
+                    Usage = ResourceUsage.Default,
+                    BindFlags = BindFlags.ShaderResource,
+                    CpuAccessFlags = CpuAccessFlags.None,
+                    OptionFlags = ResourceOptionFlags.SharedKeyedmutex
+                });
+                var mutex = texture.QueryInterface<KeyedMutex>();
+                using var resource = texture.QueryInterface<SharpDX.DXGI.Resource>();
+                surfaces[i] = new SharedSurface(texture, mutex, resource.SharedHandle);
+            }
+        }
+        catch
+        {
+            foreach (var surface in surfaces)
+            {
+                surface?.Dispose();
+            }
+
+            throw;
+        }
+
+        _sharedSurfaces = surfaces;
+        _sharedWidth = width;
+        _sharedHeight = height;
+        _sharedIndex = 0;
+    }
+
+    private void ReleaseSharedSurfaces()
+    {
+        if (_sharedSurfaces is not null)
+        {
+            foreach (var surface in _sharedSurfaces)
+            {
+                surface.Dispose();
+            }
+        }
+
+        _sharedSurfaces = null;
+        _sharedWidth = 0;
+        _sharedHeight = 0;
+    }
+
     private (double Denoise, double Grade, double Upscale, double Readback) ReadGpuTimings(double uploadMs)
     {
         try
@@ -234,6 +407,7 @@ public sealed class EnhancementEngine : IDisposable
             return;
         }
 
+        ReleaseSharedSurfaces();
         ReleaseResources();
 
         _source = new Texture2D(_device, new Texture2DDescription
@@ -447,6 +621,26 @@ public sealed class EnhancementEngine : IDisposable
         _sourceView = null;
     }
 
+    private sealed class SharedSurface : IDisposable
+    {
+        public SharedSurface(Texture2D texture, KeyedMutex mutex, IntPtr handle)
+        {
+            Texture = texture;
+            Mutex = mutex;
+            Handle = handle;
+        }
+
+        public Texture2D Texture { get; }
+        public KeyedMutex Mutex { get; }
+        public IntPtr Handle { get; }
+
+        public void Dispose()
+        {
+            Mutex.Dispose();
+            Texture.Dispose();
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)
@@ -457,6 +651,7 @@ public sealed class EnhancementEngine : IDisposable
             }
 
             _disposed = true;
+            ReleaseSharedSurfaces();
             ReleaseResources();
             _sampler.Dispose();
             _t4?.Dispose();
