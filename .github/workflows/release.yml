@@ -53,7 +53,7 @@ jobs:
         run: dotnet build FIFINE.CaptureStudio.sln -c Release --no-restore -p:Version=${{ env.VERSION }}
 
       - name: Run automated tests
-        run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release --logger "console;verbosity=normal"
+        run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release -p:Version=${{ env.VERSION }} --logger "console;verbosity=normal"
 
       - name: Verify the build reports the tagged version
         shell: pwsh
