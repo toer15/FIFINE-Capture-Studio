@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore FIFINE.CaptureStudio.sln
+
+      - name: Build
+        run: dotnet build FIFINE.CaptureStudio.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+      - name: Smoke test all views
+        run: |
+          $exe = "src/FifineCaptureStudio/bin/Release/net8.0-windows/FifineCaptureStudio.exe"
+          & $exe --smoke
+          Get-Content "$env:LOCALAPPDATA/FifineCaptureStudio/smoke.txt"
+          if (Select-String -Path "$env:LOCALAPPDATA/FifineCaptureStudio/smoke.txt" -Pattern 'FAIL' -Quiet) { exit 1 }
+
+      # Ordinary pushes only prove the code builds and passes tests. Releases come from tags.

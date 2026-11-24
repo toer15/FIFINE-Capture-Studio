@@ -1,0 +1,300 @@
+using System.Globalization;
+using System.IO;
+using FifineCaptureStudio.Core;
+
+namespace FifineCaptureStudio.Capture;
+
+public sealed class PipelineOptions
+{
+    public required SourceSpec Source { get; init; }
+    public int PreviewWidth { get; init; } = 1600;
+    public bool PreviewEnabled { get; init; } = true;
+    public bool MeasureLatency { get; init; } = true;
+    public string? RecordPath { get; init; }
+    public string? RingDirectory { get; init; }
+    public int RingSegmentSeconds { get; init; } = 2;
+    public int RingSegmentCount { get; init; } = 18;
+    public int EncodeWidth { get; init; } = 1920;
+    public int EncodeHeight { get; init; } = 1080;
+    public int EncodeFps { get; init; } = 60;
+    public int FrameGeneration { get; init; } = 1;
+    public required EncoderInfo Encoder { get; init; }
+    public int BitrateKbps { get; init; } = 20000;
+    public string QualityPreset { get; init; } = "Balanced";
+    public ContainerKind Container { get; init; } = ContainerKind.Mp4;
+    public int AudioBitrateKbps { get; init; } = 192;
+    public IReadOnlyList<string> AudioPipes { get; init; } = Array.Empty<string>();
+    public bool SeparateAudioTracks { get; init; }
+    public int AudioSampleRate { get; init; } = 48000;
+    public LowLatencyMode Latency { get; init; } = LowLatencyMode.Balanced;
+    public int VideoBufferMs { get; init; } = 120;
+
+    public bool HasRecordOutput => !string.IsNullOrEmpty(RecordPath);
+    public bool HasRingOutput => !string.IsNullOrEmpty(RingDirectory) && RingSegmentCount > 0;
+}
+
+public static class PipelineArgs
+{
+    public const string PreviewPipe = "pipe:1";
+
+    public static List<string> Build(PipelineOptions options, int previewDivisor = 1)
+    {
+        var args = new List<string>
+        {
+            "-hide_banner",
+            "-loglevel", "info",
+            "-stats_period", "0.5"
+        };
+
+        ApplyLatency(args, options);
+        AppendVideoInput(args, options.Source);
+        AppendAudioInputs(args, options);
+
+        if (options.PreviewEnabled)
+        {
+            var (previewWidth, previewHeight) = PreviewSize(options, previewDivisor);
+            args.AddRange(new[] { "-map", "0:v:0", "-an" });
+            var filters = new List<string>();
+            if (previewWidth > 0 && (previewWidth < options.Source.Width || previewHeight < options.Source.Height))
+            {
+                filters.Add($"scale={previewWidth}:{previewHeight}:flags=fast_bilinear");
+            }
+
+            if (options.MeasureLatency)
+            {
+                filters.Add("showinfo");
+            }
+
+            if (filters.Count > 0)
+            {
+                args.AddRange(new[] { "-vf", string.Join(",", filters) });
+            }
+
+            args.AddRange(new[]
+            {
+                "-c:v", "mjpeg",
+                "-q:v", "6",
+                "-threads", "2",
+                "-f", "mjpeg",
+                PreviewPipe
+            });
+        }
+
+        if (options.HasRecordOutput)
+        {
+            AppendEncodedOutput(args, options, options.RecordPath!, isRing: false);
+        }
+
+        if (options.HasRingOutput)
+        {
+            AppendEncodedOutput(args, options, Path.Combine(options.RingDirectory!, "replay_%03d.mkv"), isRing: true);
+        }
+
+        return args;
+    }
+
+    private static void ApplyLatency(List<string> args, PipelineOptions options)
+    {
+        switch (options.Latency)
+        {
+            case LowLatencyMode.UltraLow:
+                args.AddRange(new[]
+                {
+                    "-fflags", "nobuffer+genpts",
+                    "-flags", "low_delay",
+                    "-probesize", "32",
+                    "-analyzeduration", "0",
+                    "-rtbufsize", "64M"
+                });
+                break;
+
+            case LowLatencyMode.Balanced:
+                args.AddRange(new[]
+                {
+                    "-fflags", "genpts",
+                    "-probesize", "1000000",
+                    "-analyzeduration", "500000",
+                    "-rtbufsize", Math.Max(128, options.VideoBufferMs).ToString(CultureInfo.InvariantCulture) + "M"
+                });
+                break;
+
+            default:
+                args.AddRange(new[]
+                {
+                    "-probesize", "3000000",
+                    "-analyzeduration", "1000000",
+                    "-rtbufsize", "256M"
+                });
+                break;
+        }
+    }
+
+    private static void AppendVideoInput(List<string> args, SourceSpec source)
+    {
+        switch (source.Kind)
+        {
+            case CaptureSourceKind.TestPattern:
+                args.AddRange(new[]
+                {
+                    "-re",
+                    "-f", "lavfi",
+                    "-i", $"testsrc2=size={Math.Max(320, source.Width)}x{Math.Max(180, source.Height)}:rate={Math.Clamp(source.Fps, 1, 240)}"
+                });
+                break;
+
+            case CaptureSourceKind.Display:
+                args.AddRange(new[]
+                {
+                    "-f", "gdigrab",
+                    "-framerate", source.Fps.ToString(CultureInfo.InvariantCulture),
+                    "-offset_x", source.DisplayX.ToString(CultureInfo.InvariantCulture),
+                    "-offset_y", source.DisplayY.ToString(CultureInfo.InvariantCulture),
+                    "-video_size", $"{source.Width}x{source.Height}",
+                    "-draw_mouse", "1",
+                    "-i", "desktop"
+                });
+                break;
+
+            case CaptureSourceKind.Window:
+                args.AddRange(new[]
+                {
+                    "-f", "gdigrab",
+                    "-framerate", source.Fps.ToString(CultureInfo.InvariantCulture),
+                    "-i", "title=" + source.WindowTitle
+                });
+                break;
+
+            default:
+                args.AddRange(new[] { "-f", "dshow" });
+                if (source.Fps > 0)
+                {
+                    args.AddRange(new[] { "-framerate", source.Fps.ToString(CultureInfo.InvariantCulture) });
+                }
+
+                if (source.Width > 0 && source.Height > 0)
+                {
+                    args.AddRange(new[] { "-video_size", $"{source.Width}x{source.Height}" });
+                }
+
+                var format = source.InputFormat?.ToLowerInvariant();
+                if (format is "mjpeg" or "rawvideo")
+                {
+                    args.AddRange(new[] { "-vcodec", format });
+                }
+
+                args.AddRange(new[] { "-i", "video=" + source.DeviceName });
+                break;
+        }
+    }
+
+    private static void AppendAudioInputs(List<string> args, PipelineOptions options)
+    {
+        if (!options.HasRecordOutput && !options.HasRingOutput)
+        {
+            return;
+        }
+
+        foreach (var pipe in options.AudioPipes)
+        {
+            args.AddRange(new[]
+            {
+                "-f", "s16le",
+                "-ar", options.AudioSampleRate.ToString(CultureInfo.InvariantCulture),
+                "-ac", "2",
+                "-i", pipe
+            });
+        }
+    }
+
+    private static void AppendEncodedOutput(List<string> args, PipelineOptions options, string path, bool isRing)
+    {
+        args.AddRange(new[] { "-map", "0:v:0" });
+
+        if (options.AudioPipes.Count > 0)
+        {
+            for (var i = 0; i < options.AudioPipes.Count; i++)
+            {
+                args.AddRange(new[] { "-map", $"{i + 1}:a:0" });
+            }
+        }
+        else
+        {
+            args.Add("-an");
+        }
+
+        var recordFilters = new List<string>();
+        if (options.EncodeWidth != options.Source.Width || options.EncodeHeight != options.Source.Height)
+        {
+            recordFilters.Add($"scale={options.EncodeWidth}:{options.EncodeHeight}:flags=bicubic,setsar=1");
+        }
+
+        if (options.FrameGeneration > 1)
+        {
+            // Real motion-compensated interpolation, applied only to the recording.
+            recordFilters.Add(
+                $"minterpolate=fps={options.EncodeFps.ToString(CultureInfo.InvariantCulture)}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1");
+        }
+
+        if (recordFilters.Count > 0)
+        {
+            args.AddRange(new[] { "-vf", string.Join(",", recordFilters) });
+        }
+
+        args.AddRange(EncoderCatalog.BuildVideoArgs(
+            options.Encoder,
+            options.EncodeWidth,
+            options.EncodeHeight,
+            options.EncodeFps,
+            options.BitrateKbps,
+            options.QualityPreset));
+
+        args.AddRange(new[] { "-r", options.EncodeFps.ToString(CultureInfo.InvariantCulture) });
+
+        if (options.AudioPipes.Count > 0)
+        {
+            args.AddRange(new[]
+            {
+                "-c:a", "aac",
+                "-b:a", options.AudioBitrateKbps + "k",
+                "-ar", options.AudioSampleRate.ToString(CultureInfo.InvariantCulture),
+                "-ac", "2"
+            });
+        }
+
+        args.AddRange(new[] { "-max_muxing_queue_size", "2048" });
+
+        if (isRing)
+        {
+            args.AddRange(new[]
+            {
+                "-f", "segment",
+                "-segment_time", Math.Max(1, options.RingSegmentSeconds).ToString(CultureInfo.InvariantCulture),
+                "-segment_wrap", Math.Max(2, options.RingSegmentCount).ToString(CultureInfo.InvariantCulture),
+                "-reset_timestamps", "1",
+                "-segment_format", "matroska",
+                "-y", path
+            });
+            return;
+        }
+
+        if (options.Container == ContainerKind.Mkv)
+        {
+            args.AddRange(new[] { "-f", "matroska", "-y", path });
+        }
+        else
+        {
+            args.AddRange(new[] { "-f", "mp4", "-movflags", "+faststart", "-y", path });
+        }
+    }
+
+    private static (int Width, int Height) PreviewSize(PipelineOptions options, int divisor)
+    {
+        var width = options.PreviewWidth <= 0 ? options.Source.Width : Math.Min(options.PreviewWidth, options.Source.Width);
+        width = Math.Max(320, width / Math.Max(1, divisor));
+        var height = (int)Math.Round(width * (double)options.Source.Height / Math.Max(1, options.Source.Width));
+        // Keep even dimensions for the MJPEG encoder.
+        width -= width % 2;
+        height -= height % 2;
+        return (width, Math.Max(180, height));
+    }
+}

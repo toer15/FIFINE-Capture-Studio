@@ -1,0 +1,30 @@
+# Build output
+bin/
+obj/
+artifacts/
+Releases*/
+publish*/
+*.nupkg
+release-notes*.md
+setup-*.log
+*.user
+*.suo
+.vs/
+
+# Local tooling and secrets
+.env
+.dev.vars
+*.secrets
+*.pfx
+*.snk
+token.txt
+
+# Logs and local state
+*.log
+logs/
+docs/*.tmp
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store

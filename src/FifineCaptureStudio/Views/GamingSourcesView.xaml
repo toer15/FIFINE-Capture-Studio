@@ -1,0 +1,363 @@
+<UserControl x:Class="FifineCaptureStudio.Views.GamingSourcesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <Style x:Key="SourceLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.2" />
+            <Setter Property="Foreground" Value="#FF8D98AC" />
+            <Setter Property="Margin" Value="0,0,0,5" />
+        </Style>
+        <Style x:Key="PlatformCard" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{StaticResource TextDim}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bg" CornerRadius="12" Background="#FF101725" BorderBrush="#FF212B3F" BorderThickness="1" Padding="14,13">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#FF3A4A67" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#FF1B1A3B" />
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#FF8B7BFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DiagramBox" TargetType="Border">
+            <Setter Property="Background" Value="#FF101725" />
+            <Setter Property="BorderBrush" Value="#FF253048" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="Width" Value="168" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16,12,16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <StackPanel>
+                <TextBlock Text="Gaming Sources" Style="{StaticResource H1}" />
+                <TextBlock Text="Pick the platform, follow the wiring, and capture exactly the modes the hardware exposes."
+                           Style="{StaticResource Caption}" Margin="0,2,0,0" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Style="{StaticResource GhostButton}" Height="34" Content="Rescan hardware"
+                        Command="{Binding RefreshDevicesCommand}" />
+                <Button Style="{StaticResource AccentButton}" Height="34" Width="130" Margin="8,0,0,0" Content="Start capture"
+                        Command="{Binding StartCaptureCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- platform selector -->
+        <UniformGrid Grid.Row="2" Columns="3">
+            <RadioButton Style="{StaticResource PlatformCard}" GroupName="PlatformSelect" Margin="0,0,6,0"
+                         IsChecked="{Binding IsPlatformPC, Mode=OneWay}"
+                         Command="{Binding SelectPlatformCommand}" CommandParameter="PC">
+                <StackPanel>
+                    <Path Data="{StaticResource IconMonitor}" Stroke="#FFB2A8FF" StrokeThickness="1.6" Width="22" Height="22" Stretch="Uniform" />
+                    <TextBlock Text="PC Gaming" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,9,0,0" />
+                    <TextBlock Text="Game window, display or capture card" Style="{StaticResource CaptionTiny}" Margin="0,3,0,0" />
+                </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource PlatformCard}" GroupName="PlatformSelect" Margin="3,0"
+                         IsChecked="{Binding IsPlatformPS5, Mode=OneWay}"
+                         Command="{Binding SelectPlatformCommand}" CommandParameter="PS5">
+                <StackPanel>
+                    <Path Data="M9.6,4.2 C15.3,5.1 19.2,7.9 19.2,12.1 V19.6 H15.9 V13.1 C15.9,10.9 14.1,9.3 11.1,8.8 Z M5.2,5 L8.4,5.6 V17.3 L11.4,16.4 V20 L5.2,21 Z"
+                          Fill="#FFB2A8FF" Width="22" Height="22" Stretch="Uniform" />
+                    <TextBlock Text="PlayStation 5" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,9,0,0" />
+                    <TextBlock Text="HDMI into a UVC capture card" Style="{StaticResource CaptionTiny}" Margin="0,3,0,0" />
+                </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource PlatformCard}" GroupName="PlatformSelect" Margin="6,0,0,0"
+                         IsChecked="{Binding IsPlatformXbox, Mode=OneWay}"
+                         Command="{Binding SelectPlatformCommand}" CommandParameter="Xbox">
+                <StackPanel>
+                    <Path Data="{StaticResource IconXbox}" Stroke="#FFB2A8FF" StrokeThickness="1.6" Width="22" Height="22" Stretch="Uniform" />
+                    <TextBlock Text="Xbox" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,9,0,0" />
+                    <TextBlock Text="Series X/S and Xbox One" Style="{StaticResource CaptionTiny}" Margin="0,3,0,0" />
+                </StackPanel>
+            </RadioButton>
+        </UniformGrid>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.15*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Style="{StaticResource Card}" Padding="18,16">
+                        <StackPanel>
+                            <TextBlock Text="{Binding PlatformTitle}" Style="{StaticResource H2}" />
+                            <TextBlock Text="{Binding PlatformChipLabel}" Style="{StaticResource CaptionTiny}" Margin="0,4,0,14" />
+
+                            <Button Style="{StaticResource AccentButton}" Height="34" Width="210" HorizontalAlignment="Left"
+                                    Margin="0,0,0,14" FontSize="12" Command="{Binding OpenPairingCommand}" CommandParameter="{Binding PairingPlatformParameter}"
+                                    Content="{Binding PairingButtonLabel}" />
+
+                            <TextBlock Text="Connection guide" Style="{StaticResource SourceLabel}" />
+                            <TextBlock Text="{Binding PlatformConnectionGuide}" Style="{StaticResource Body}" TextWrapping="Wrap"
+                                       FontSize="12.5" LineHeight="26" Margin="0,0,0,16" />
+
+                            <StackPanel Orientation="Horizontal"
+                                        Visibility="{Binding IsPlatformPC, Converter={StaticResource InverseBoolToVis}}">
+                                <Border Style="{StaticResource DiagramBox}">
+                                    <StackPanel>
+                                        <TextBlock Text="Console" Style="{StaticResource CaptionTiny}" />
+                                        <TextBlock Text="HDMI OUT" Style="{StaticResource Body}" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="→" Foreground="#FF6F7B90" FontSize="16" VerticalAlignment="Center" Margin="10,0" />
+                                <Border Style="{StaticResource DiagramBox}">
+                                    <StackPanel>
+                                        <TextBlock Text="Capture card" Style="{StaticResource CaptionTiny}" />
+                                        <TextBlock Text="HDMI IN → USB" Style="{StaticResource Body}" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="→" Foreground="#FF6F7B90" FontSize="16" VerticalAlignment="Center" Margin="10,0" />
+                                <Border Style="{StaticResource DiagramBox}">
+                                    <StackPanel>
+                                        <TextBlock Text="This PC" Style="{StaticResource CaptionTiny}" />
+                                        <TextBlock Text="USB 3 port" Style="{StaticResource Body}" FontWeight="SemiBold" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Border Style="{StaticResource InnerPanel}" Padding="12,10" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconWarning}" Stroke="{StaticResource Amber}" StrokeThickness="1.5"
+                                              Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+                                        <TextBlock Text="HDCP and protected content" Style="{StaticResource Metric}" Margin="7,0,0,0" FontSize="11.5" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding PlatformHdcpNote}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Text="{Binding PlatformCapabilityNote}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                            <TextBlock Text="{Binding ControllerHint}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="18,16" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Detected capture formats" Style="{StaticResource CardTitle}" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding CaptureFormatSummary}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding InputFormatsLabel}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="18,16" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Platform compatibility database" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="How each generation can actually be captured. Nothing is marked fully supported until it has been tested on that hardware."
+                                       Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,5,0,12" />
+
+                            <TextBlock Text="PLAYSTATION" Style="{StaticResource CaptionTiny}" FontWeight="SemiBold" Foreground="#FF9B8BFF" />
+                            <ItemsControl ItemsSource="{Binding PlayStationPlatforms}" Margin="0,6,0,10">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#FF101725" BorderBrush="#FF1E2740" BorderThickness="1" CornerRadius="9" Padding="11,9" Margin="0,0,0,6">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Name}" Foreground="#FFE6EBF5" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <Border HorizontalAlignment="Right" Background="#1410" BorderBrush="{Binding StateColor}" BorderThickness="1"
+                                                            CornerRadius="6" Padding="6,2">
+                                                        <TextBlock Text="{Binding StateLabel}" Foreground="{Binding StateColor}" FontSize="9" FontWeight="Bold" />
+                                                    </Border>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Methods}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Notes}" Style="{StaticResource CaptionTiny}" Foreground="#FF7C879B" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Style="{StaticResource CaptionTiny}" Foreground="#FF6F7B90" Margin="0,3,0,0">
+                                                    <Run Text="Modes:" /><Run Text=" " /><Run Text="{Binding Resolution}" /><Run Text=" · " /><Run Text="{Binding Fps}" /><Run Text=" · " /><Run Text="{Binding Audio}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="XBOX" Style="{StaticResource CaptionTiny}" FontWeight="SemiBold" Foreground="#FF45D69A" />
+                            <ItemsControl ItemsSource="{Binding XboxPlatforms}" Margin="0,6,0,10">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#FF101725" BorderBrush="#FF1E2740" BorderThickness="1" CornerRadius="9" Padding="11,9" Margin="0,0,0,6">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Name}" Foreground="#FFE6EBF5" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <Border HorizontalAlignment="Right" Background="#1410" BorderBrush="{Binding StateColor}" BorderThickness="1"
+                                                            CornerRadius="6" Padding="6,2">
+                                                        <TextBlock Text="{Binding StateLabel}" Foreground="{Binding StateColor}" FontSize="9" FontWeight="Bold" />
+                                                    </Border>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Methods}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Notes}" Style="{StaticResource CaptionTiny}" Foreground="#FF7C879B" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Style="{StaticResource CaptionTiny}" Foreground="#FF6F7B90" Margin="0,3,0,0">
+                                                    <Run Text="Modes:" /><Run Text=" " /><Run Text="{Binding Resolution}" /><Run Text=" · " /><Run Text="{Binding Fps}" /><Run Text=" · " /><Run Text="{Binding Audio}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="PC" Style="{StaticResource CaptionTiny}" FontWeight="SemiBold" Foreground="#FF35C9FF" />
+                            <ItemsControl ItemsSource="{Binding PcPlatforms}" Margin="0,6,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#FF101725" BorderBrush="#FF1E2740" BorderThickness="1" CornerRadius="9" Padding="11,9" Margin="0,0,0,6">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <TextBlock Text="{Binding Name}" Foreground="#FFE6EBF5" FontSize="12.5" FontWeight="SemiBold" />
+                                                    <Border HorizontalAlignment="Right" Background="#1410" BorderBrush="{Binding StateColor}" BorderThickness="1"
+                                                            CornerRadius="6" Padding="6,2">
+                                                        <TextBlock Text="{Binding StateLabel}" Foreground="{Binding StateColor}" FontSize="9" FontWeight="Bold" />
+                                                    </Border>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Methods}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Notes}" Style="{StaticResource CaptionTiny}" Foreground="#FF7C879B" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Style="{StaticResource CaptionTiny}" Foreground="#FF6F7B90" Margin="0,3,0,0">
+                                                    <Run Text="Modes:" /><Run Text=" " /><Run Text="{Binding Resolution}" /><Run Text=" · " /><Run Text="{Binding Fps}" /><Run Text=" · " /><Run Text="{Binding Audio}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border Style="{StaticResource Card}" Padding="16,14">
+                        <StackPanel>
+                            <TextBlock Text="Capture source" Style="{StaticResource CardTitle}" Margin="0,0,0,12" />
+
+                            <TextBlock Text="Capture mode" Style="{StaticResource SourceLabel}" />
+                            <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding CaptureModes}"
+                                      DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding SelectedCaptureMode, Mode=TwoWay}"
+                                      ToolTip="{Binding CaptureModeNote}" />
+                            <TextBlock Text="{Binding CaptureModeNote}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+                            <TextBlock Text="Method" Style="{StaticResource SourceLabel}" Margin="0,12,0,0" />
+                            <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding SourceKinds}"
+                                      DisplayMemberPath="Label" SelectedItem="{Binding SelectedSourceKind, Mode=TwoWay}" />
+
+                            <StackPanel Margin="0,12,0,0" Visibility="{Binding IsSourceCaptureCard, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Capture device" Style="{StaticResource SourceLabel}" />
+                                <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding VideoDevices}"
+                                          DisplayMemberPath="Name" SelectedItem="{Binding SelectedVideoDevice, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,12,0,0" Visibility="{Binding IsSourceDisplay, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Display" Style="{StaticResource SourceLabel}" />
+                                <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding Displays}"
+                                          DisplayMemberPath="Name" SelectedItem="{Binding SelectedDisplay, Mode=TwoWay}" />
+                            </StackPanel>
+
+                            <StackPanel Margin="0,12,0,0" Visibility="{Binding IsSourceWindow, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Game window" Style="{StaticResource SourceLabel}" />
+                                <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding Windows}"
+                                          DisplayMemberPath="Title" SelectedItem="{Binding SelectedWindow, Mode=TwoWay}" />
+                                <TextBlock Text="Windows that draw with hardware overlays cannot be grabbed by GDI. Choose Desktop / display capture for those games."
+                                           Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <Border Style="{StaticResource InnerPanel}" Padding="10,8" Margin="0,12,0,0"
+                                    Visibility="{Binding IsSourceTest, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding SourceKindHint}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" />
+                            </Border>
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Resolution" Style="{StaticResource SourceLabel}" />
+                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding ResolutionOptions}"
+                                              DisplayMemberPath="Label" SelectedItem="{Binding SelectedResolution, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                    <TextBlock Text="Frame rate" Style="{StaticResource SourceLabel}" />
+                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding FpsOptions}"
+                                              DisplayMemberPath="Label" SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="{Binding SourceKindHint}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,10,0,0">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <TextBlock Text="Detected hardware" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{Binding DeviceConnectionText}" Style="{StaticResource CaptionTiny}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding VideoDevices}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#FF101725" CornerRadius="9" Padding="10,7" Margin="0,0,0,6">
+                                            <Grid>
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Ellipse Width="6" Height="6" Fill="{StaticResource Green}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Caption}" Margin="8,0,0,0"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="180" />
+                                                </StackPanel>
+                                                <TextBlock Text="UVC" Style="{StaticResource CaptionTiny}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="Display adapters, monitors and audio endpoints are enumerated from Windows on every rescan — no device names are invented."
+                                       Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="16,14" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Capture state" Style="{StaticResource CardTitle}" Margin="0,0,0,10" />
+                            <Grid Margin="0,0,0,7">
+                                <TextBlock Text="Signal" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding CaptureStateText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Grid Margin="0,0,0,7">
+                                <TextBlock Text="Measured FPS" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding FpsText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Grid>
+                                <TextBlock Text="Latency" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding LatencyText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Button Style="{StaticResource GhostButton}" Height="32" Margin="0,12,0,0"
+                                    Content="Open live capture" Command="{Binding NavigateCommand}" CommandParameter="capture" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>
