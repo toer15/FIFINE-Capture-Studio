@@ -158,35 +158,123 @@ audio pipe and replay behaviour, and never receives generated frames. Aligning t
 stages would require a matching LUT chain in the recording filter; until that is validated visually,
 the difference is documented rather than glossed over.
 
-## Frame generation — not enabled
+## Live frame generation — 2× RIFE (implemented)
 
-No 2X/3X/4X setting is offered, because the project does not yet have a frame-generation pipeline
-that could honestly display what it generates:
+A real 60 → 120 FPS path is implemented for the Gaming Enhancement page. It is separate from the
+older recording-only FFmpeg `minterpolate` option: the live path uses a neural network and a native
+presenter, and generated frames are never written into a recording.
 
-* **AMD FSR / AFMF** operate inside a game's own swapchain through the driver and cannot process an
-  external console or capture-card video stream.
-* **FFmpeg `minterpolate`** is CPU motion interpolation and cannot sustain 1080p60 in real time; the
-  user brief explicitly excludes shipping it as "AI frame generation" (the older recording-only
-  auto-interpolation setting is separate and is not presented as this engine).
-* A genuine implementation needs a GPU optical-flow estimator, bidirectional warping with occlusion
-  handling, scene-cut detection and, critically, a **high-refresh Direct3D swapchain presenter** —
-  WPF's compositor cannot present 120–240 generated frames per second, so generating them into the
-  existing preview would show fabricated numbers rather than real output.
+### Engine and model
 
-The FRAME GENERATION card in the app states this; it contains no decorative controls and no invented
-FPS. The measured headroom above is the budget such a pipeline would have.
+| Item | Value |
+|---|---|
+| Engine | ONNX Runtime 1.24.4, DirectML execution provider (AMD, Intel or NVIDIA) |
+| Model | RIFE 4.25 lite, ONNX opset 17, float32, dynamic shape |
+| Model size | 22,677,513 bytes |
+| SHA-256 | `702802d0862ab78f2d72133c6bc3768e7e89b81756f7cd51d1055a2fe3d06577` |
+| Source | `https://huggingface.co/t9749/rife-4.25-lite-onnx` (`rife_v425lite.onnx`) |
+| Licence | MIT, © 2021 hzwer |
+| Install | Explicit **Install 22 MB model** action on the card, checksum verified; never downloaded silently |
+| Offline | Inference is fully local; no API, credits or network after installation |
 
-A future generator also implies a latency trade-off that must be measured, not hand-waved: temporal
-interpolation needs the next source frame before it can synthesise an in-between frame, so enabling it
-adds at least one source-frame interval of lookahead. For a 60 fps source that is ≈16.7 ms before the
-presenter draws anything. The pipeline and UI keep source FPS, generated FPS and display FPS as three
-separate numbers precisely so this cannot be hidden behind "120 FPS". Generating frames never makes a
-60 Hz game render or respond like a native 120 Hz game.
+`FIFINE_RIFE_MODEL` or `--model` can point at another copy. `--fg-bench` verifies that the session
+really contains 488 DirectML nodes, that `GridSample` (the optical-flow warp) runs on the GPU, and
+that the output differs from both inputs
+and from a 50/50 cross-fade. That last check matters: a blend or duplicate would be rejected.
 
-The compute pipeline already exposes the seams a real implementation needs: per-frame sequence and
-timestamp, a bounded frame slot, GPU-resident frames between passes, and a presentation notification.
-What does not exist yet is the optical-flow/motion-compensation engine and a non-WPF high-refresh
-presenter (DXGI flip-model swap chain); until both exist and are measured, the feature stays absent.
+### Pipeline
+
+```
+PS5 Remote Play / capture card / test pattern
+  → FFmpeg MJPEG decode (existing capture path)
+  → optional Direct3D 11 enhancement
+  → newest-frame slot (bounded; stale frames replaced, never queued)
+  → RIFE 4.25 lite on DirectML at an internal 64-aligned size
+  → DXGI flip-model fullscreen presenter
+```
+
+For each consecutive pair the pipeline presents the held first original, the neural midpoint, then the
+second original when its due time arrives. Sequence gaps, dropped frames, resolution changes and
+scene cuts reset temporal history instead of pairing unrelated images. A generated frame whose
+inference finishes too late for its midpoint is skipped according to the latency preference
+(Competitive is strictest, Smooth is most tolerant); originals keep flowing so latency never grows.
+
+Internal inference sizes are deliberately below the presented resolution:
+
+| Preset | Internal size | Presenter output |
+|---|---:|---:|
+| Performance | 768 × 448 | display size via DXGI stretch |
+| Balanced | 896 × 512 | display size via DXGI stretch |
+| Quality | 1024 × 576 | display size via DXGI stretch |
+
+This is a genuine quality/performance fallback, not a pretence of native-resolution inference.
+
+### Native presenter
+
+A borderless Win32 window owns a Direct3D 11 flip-sequential swapchain on a dedicated thread. Frames
+are copied into a dynamic BGRA texture, `CopyResource`d to the back buffer and presented with vsync;
+DXGI stretches the internal buffer to the display. WPF is not in the 120 FPS path. The presenter
+refuses to open on a display slower than 100 Hz and falls back to the existing WPF fullscreen preview
+with an explanation. **Tab** holds original frames, **Esc** returns to the studio, and closing it
+restores the normal UI.
+
+### Measured on the RX 9070 XT
+
+Synthetic motion, `--fg-bench`, 30 iterations after warm-up:
+
+| Internal size | Inference avg | p95 | Total pipeline | Generated fps |
+|---|---:|---:|---:|---:|
+| 1024 × 576 | 12.47 ms | 13.79 ms | 14.80 ms (p95 16.36) | 67.6 |
+| 896 × 512 | 10.25 ms | 11.51 ms | 12.06 ms (p95 13.28) | 82.9 |
+| 768 × 448 | 8.52 ms | 9.56 ms | 9.94 ms (p95 11.45) | 100.6 |
+| 1280 × 704 | 17.45 ms | 18.04 ms | 21.05 ms (p95 21.75) | 47.5 |
+
+All 488 compute nodes run on DirectML. 198 `Gather`/`Cast`/`Concat`-class shape nodes remain on CPU
+(sub-millisecond), while `GridSample` is on the GPU; without that, the real-time claim would be false.
+
+One generated frame is needed per source pair, so a 60 FPS source needs about 60 generated fps — not
+120 — plus enough headroom for scheduling and enhancement. 768 × 448 clears it, 1280 × 704 does not,
+which is why 1440p-class native inference is not the default.
+
+Live capture, 1920 × 1080 60 FPS generated test pattern with enhancement enabled, 280 Hz display:
+
+| Preset | Presented | Source / generated | Inference avg / p95 | Missed deadlines | Queue age |
+|---|---:|---:|---:|---:|---:|
+| Performance | **120.5 FPS** | 1138 / 1136 | 11.80 / 12.97 ms | 6 | 2.7 ms |
+| Balanced | 105.4 FPS | — | 14.59 / 15.61 ms | 66 | 2.5 ms |
+| Quality | 88.3 FPS | — | — | 277 | 3.9 ms |
+
+Only the Performance preset held the 120 FPS target in this live run; Balanced and Quality were
+honest about falling short instead of hiding it. The native presenter self-test (`--fg-present-test`)
+presented 360/360 synthetic frames at 119.6 FPS with zero missed deadlines, which verifies cadence
+independently of capture.
+
+### What is not claimed
+
+* This was verified with a generated 60 FPS test pattern, **not** with a real PS5 Remote Play session
+  or a capture card. Hardware validation is still outstanding.
+* Generated frames are interpolated output, not native 120 FPS game rendering; console input latency
+  and game simulation remain at 60 FPS.
+* 3X, 4X and 240 FPS are not implemented and are not offered. The target list therefore contains
+  only Auto (2× source) and 120 FPS.
+* There is no HUD/UI protection yet. Fast camera motion, disocclusion, fine text and particle effects
+  can produce the usual RIFE artifacts; scene cuts are detected and skipped rather than interpolated.
+* Enhancement and RIFE do not share a GPU texture. Frames cross into the model as CPU float tensors
+  (about 2.5 ms of pre/post work), and the presenter uploads each frame. This is a documented fallback,
+  not zero-copy.
+* Temporal interpolation needs the next source frame: the presenter path adds about one source
+  interval (16.7 ms at 60 FPS) plus inference. The app does not automatically delay audio to match
+  that small offset; per-channel audio delay and the existing A/V offset remain the manual controls.
+  Recordings keep their own original video and audio timeline, so recording sync is unchanged.
+* HDMI passthrough to a television remains the console's original signal. Generated frames appear
+  only on the display driven by FIFINE's native presenter (or mirrored from it).
+
+### Recording and passthrough
+
+Live frame generation is presentation-only. Normal recordings stay at the configured recording FPS and
+never receive generated frames; the recording output control is independent of the presenter. The
+older recording-only `minterpolate` option still exists for users who explicitly select it, but it is
+CPU encode-time interpolation and is not this feature.
 
 ## Limits
 
@@ -195,7 +283,7 @@ presenter (DXGI flip-model swap chain); until both exist and are measured, the f
   upload per displayed frame remain.
 * The 4K native path is GPU-feasible (13.1 ms average here) but upload-bound; the automatic fallback
   protects 60 fps sources when MJPEG decode cannot hold the budget.
-* Presentation still goes through the WPF compositor. A DXGI flip-model / DirectComposition presenter
-  for high-refresh generated frames is designed for but not implemented.
+* The normal preview and WPF fullscreen comparison still go through the WPF compositor. Only the
+  120 FPS frame-generation presenter is a native DXGI surface.
 * Enhancement adds GPU load and preview latency; Ultra Low Latency reduces or disables passes.
 * HDR processing is not offered, because the capture paths do not expose reliable HDR metadata.

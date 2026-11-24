@@ -197,6 +197,7 @@ public sealed partial class StudioViewModel : ObservableObject
         RunCaptureTestCommand = new AsyncRelayCommand(RunCaptureTestAsync);
         FinishWizardCommand = new AsyncRelayCommand(FinishWizardAsync);
         InitializeEnhancement();
+        InitializeFrameGeneration();
 
         // Onboarding is an overlay that must not be visible until settings say it is due.
         // The default state is hidden, so a slow or failed start-up can never leave it on screen.
@@ -1969,6 +1970,7 @@ public sealed partial class StudioViewModel : ObservableObject
 
         RaiseConsoleState();
         RaiseEnhancementStats();
+        RaiseFrameGenerationStats();
         Raise(nameof(FpsText));
         Raise(nameof(FpsChipLive));
         Raise(nameof(OutputFpsLabel));
@@ -2076,6 +2078,12 @@ public sealed partial class StudioViewModel : ObservableObject
     private void OnFrameArrived(PreviewFrame frame)
     {
         OriginalPreviewImage = frame.Image;
+
+        // When the enhanced preview is active its worker submits the enhanced pixels instead.
+        if (!_services.Enhancement.ShouldEnhancePreview || ShowOriginal)
+        {
+            SubmitBitmapForGeneration(frame.Image, frame.Sequence, frame.DecodedAtTicks);
+        }
 
         if (_services.Enhancement.ShouldEnhancePreview && !ShowOriginal)
         {

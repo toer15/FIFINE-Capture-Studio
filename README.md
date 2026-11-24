@@ -38,7 +38,8 @@ allows, record, save replays and watch performance. It is not a video-production
 | Fullscreen preview | Separate borderless window on the target monitor, `Uniform` stretch, hover-revealed controls (exit, mute, resolution, FPS, recording timer, latency), `Esc` / `F` to leave, no pipeline restart |
 | Live monitoring | Per-source monitor toggles (microphone, game, capture card), output device selection, independent monitor volume; monitoring is a separate render path and never adds audio to the recording |
 | AMD AFMF | Real detection of the Radeon adapter, driver version and ADLX runtime. The toggle stays disabled with an explanation until an ADLX binding exists — it never fakes a driver change |
-| Frame generation | Optional recording-only interpolation (`minterpolate`), 2X and 4X, capped by resolution and a 240 FPS ceiling; preview and console rendering are unaffected |
+| Live frame generation | Real 2× RIFE 4.25 lite neural interpolation on DirectML, presented at 120 FPS by a native DXGI flip-model fullscreen presenter; 60 FPS source → 120 FPS presented. Off by default, presenter-only, never written to recordings |
+| Recording interpolation | Optional recording-only CPU `minterpolate` (2X/4X) at encode time, separate from the live neural path |
 
 ### Deliberately honest limitations
 
@@ -51,7 +52,7 @@ allows, record, save replays and watch performance. It is not a video-production
 * **Console network capture**: no PlayStation or Xbox generation exposes a sanctioned third-party API that hands console frames to a Windows app. The compatibility database marks every console as requiring capture hardware. Remote Play and the Xbox app are other vendors' features and are not presented as FIFINE technology.
 * **FIFINE Link Agent**: the network-capture mode is visible but disabled in this build because the companion sender is not shipped. It is marked EXPERIMENTAL in the database rather than pretending to work.
 * **AMD AFMF**: AFMF is a driver-level Radeon setting reachable only through AMD's ADLX SDK. No ADLX runtime ships with this build, so the setting reports "cannot be controlled" and refuses to flip. Advanced AFMF options are not shown at all.
-* **Frame generation**: only 2X and 4X are offered, via CPU motion interpolation at encode time. 8X and 16X would need a GPU optical-flow engine this build does not have. Generated frames add smoothness to the file, not new game information.
+* **Frame generation**: live 2× neural interpolation is real and measured, but it is not native 120 FPS rendering — the game still simulates and responds at 60 FPS. Only 2× exists; 3X/4X/240 are not offered. The neural path needs one source-frame interval of look-ahead, and automatic audio-delay matching is not applied. Recording-only `minterpolate` remains a separate, explicitly selected option.
 * **Instant replay while recording**: the replay ring is paused during recording because a UVC card exposes a single stream; the UI states this.
 * **Test pattern**: a generated `testsrc2` source exists so the pipeline can be verified without hardware. It is labelled as generated, and every metric shown comes from that real encode.
 
@@ -174,8 +175,12 @@ capture cards, displays and windows:
   capture-to-present average/p95 are measured; shader time is never reported as total latency.
 * Enhanced recordings use a Vulkan/libplacebo filter chain in the existing encoder, keep the full source
   resolution, and never contain generated frames.
-* Frame generation is **not** offered: see [docs/ENHANCEMENT.md](docs/ENHANCEMENT.md) for the measured
-  numbers and the honest technical reason no fake 2X/3X/4X switch exists.
+* Live **2× neural frame generation** is offered: RIFE 4.25 lite on DirectML turns a 60 FPS capture
+  into an interpolated 120 FPS presentation through a native DXGI presenter. It measured 120.5 FPS
+  presented on the RX 9070 XT at the 768 × 448 preset; Balanced/Quality fall short and say so. See
+  [docs/ENHANCEMENT.md](docs/ENHANCEMENT.md) for model provenance, checksums, latency and limits.
+  The feature is presentation-only: recordings never receive generated frames, and HDMI passthrough
+  remains the console's original signal.
 
 On the RX 9070 XT the engine measured 2.67 ms per native 1080p frame and 4.71 ms per native 1440p frame;
 a live 1080p60 capture with native input sustained 60.1 processed and presented fps at 4.2 ms average

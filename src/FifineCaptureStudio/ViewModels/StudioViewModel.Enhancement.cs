@@ -685,6 +685,18 @@ public sealed partial class StudioViewModel
                     Log.Debug("Enhancement worker: " + ex.Message);
                 }
 
+                // Feed the frame-generation pipeline from the pre-presentation thread. Recordings
+                // never see these frames; only the native presenter does.
+                if (result is not null)
+                {
+                    SubmitFrameForGeneration(result.Pixels, result.OutputWidth, result.OutputHeight,
+                        item.Arrival.Sequence, item.Arrival.ArrivalTicks);
+                }
+                else
+                {
+                    SubmitBitmapForGeneration(item.Image, item.Arrival.Sequence, item.Arrival.ArrivalTicks);
+                }
+
                 _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
                 {
                     _framePending = 0;

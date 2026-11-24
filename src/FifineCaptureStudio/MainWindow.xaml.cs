@@ -213,8 +213,23 @@ public partial class MainWindow : Window
         BorderThickness = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(1);
     }
 
-    private void ToggleFullScreen()
+    private async void ToggleFullScreen()
     {
+        if (ViewModel.FrameGenerationActive)
+        {
+            ViewModel.StopNativePresenter();
+            return;
+        }
+
+        if (ViewModel.FrameGenerationEnabled)
+        {
+            var owner = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (await ViewModel.StartFrameGenerationPresenterAsync(owner))
+            {
+                return;
+            }
+        }
+
         if (PageHost.Content is not LiveCaptureView && PageHost.Content is not DashboardView)
         {
             ViewModel.CurrentPage = "capture";

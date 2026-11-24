@@ -25,6 +25,18 @@ public static class Program
             return;
         }
 
+        if (args.Contains("--fg-bench"))
+        {
+            Core.FrameGeneration.FrameGenerationBench.Run(args);
+            return;
+        }
+
+        if (args.Contains("--fg-present-test"))
+        {
+            Rendering.PresenterSelfTest.Run(args);
+            return;
+        }
+
         if (args.Contains("--update-test"))
         {
             var source = args.SkipWhile(a => a != "--update-test").Skip(1).FirstOrDefault();
