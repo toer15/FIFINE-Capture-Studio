@@ -245,9 +245,10 @@ Live capture, 1920 × 1080 60 FPS generated test pattern with enhancement enable
 | Quality | 88.3 FPS | — | — | 277 | 3.9 ms |
 
 Only the Performance preset held the 120 FPS target in this live run; Balanced and Quality were
-honest about falling short instead of hiding it. The native presenter self-test (`--fg-present-test`)
-presented 360/360 synthetic frames at 119.6 FPS with zero missed deadlines, which verifies cadence
-independently of capture.
+honest about falling short instead of hiding it. Repeated Performance runs measured 118.7–120.5
+presented FPS, with process-local VRAM around 400 MB (enhancement, RIFE and presenter together).
+The native presenter self-test (`--fg-present-test`) presented 360/360 synthetic frames at 119.6 FPS
+with zero missed deadlines, which verifies cadence independently of capture.
 
 ### What is not claimed
 

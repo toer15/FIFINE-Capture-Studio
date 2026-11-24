@@ -159,7 +159,13 @@ public sealed class FrameGenerationService : IDisposable
         }
 
         Interlocked.Increment(ref _generated);
-        _lastVramQueryTicks = Stopwatch.GetTimestamp();
+        // DXGI memory queries are cheap but not free; once a second is enough for a status readout.
+        var nowTicks = Stopwatch.GetTimestamp();
+        if (nowTicks - _lastVramQueryTicks > Stopwatch.Frequency)
+        {
+            _vramMb = _engine?.QueryVramUsedMb() ?? 0;
+            _lastVramQueryTicks = nowTicks;
+        }
         _generatedFpsFrames++;
         var generatedWindow = (DateTime.UtcNow - _generatedWindow).TotalSeconds;
         if (generatedWindow >= 0.5)

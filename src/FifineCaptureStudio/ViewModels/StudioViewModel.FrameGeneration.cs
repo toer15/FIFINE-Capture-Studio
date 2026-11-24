@@ -157,9 +157,13 @@ public sealed partial class StudioViewModel
         get
         {
             var service = _services.FrameGeneration;
-            return service.Ready
-                ? $"{service.Provider} · {_services.Performance.GpuName} · {(service.GpuVerified ? "GPU verified" : service.PlacementReport)}"
-                : "Not loaded";
+            if (!service.Ready)
+            {
+                return "Not loaded";
+            }
+
+            var vram = service.VramMb > 0 ? $" · {service.VramMb:0} MB VRAM" : string.Empty;
+            return $"{service.Provider} · {_services.Performance.GpuName} · {(service.GpuVerified ? "GPU verified" : service.PlacementReport)}{vram}";
         }
     }
 
@@ -223,7 +227,8 @@ public sealed partial class StudioViewModel
         {
             var service = _services.FrameGeneration;
             if (!FrameGenerationActive) return "—";
-            return $"{service.QueueAgeMs:0.0} ms queue · {_nativePresenter?.LatenessMs ?? 0:0.0} ms late";
+            var vram = service.VramMb > 0 ? $" · {service.VramMb:0} MB VRAM" : string.Empty;
+            return $"{service.QueueAgeMs:0.0} ms queue · {_nativePresenter?.LatenessMs ?? 0:0.0} ms late{vram}";
         }
     }
 
@@ -404,7 +409,8 @@ public sealed partial class StudioViewModel
                 "skipped late  = " + (service.SkippedInterpolations - _fgSessionSkippedStart) + "\n" +
                 "dropped pairs = " + service.DroppedFrames + "\n" +
                 "inference     = " + service.AverageInferenceMs.ToString("0.00") + " ms avg / " +
-                service.P95InferenceMs.ToString("0.00") + " ms p95\n");
+                service.P95InferenceMs.ToString("0.00") + " ms p95\n" +
+                "vram          = " + service.VramMb.ToString("0") + " MB\n");
         }
         catch
         {

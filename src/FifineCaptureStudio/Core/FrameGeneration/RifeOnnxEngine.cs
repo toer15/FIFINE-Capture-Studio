@@ -33,6 +33,7 @@ public sealed class RifeOnnxEngine : IDisposable
     private readonly DenseTensor<float> _img1;
     private readonly float[] _rgb0;
     private readonly float[] _rgb1;
+    private readonly SharpDX.DXGI.Adapter3? _adapter;
 
     public int Width { get; }
     public int Height { get; }
@@ -81,6 +82,19 @@ public sealed class RifeOnnxEngine : IDisposable
         Provider = "DmlExecutionProvider";
 
         _session = new InferenceSession(modelPath, options);
+        try
+        {
+            using var device = new SharpDX.Direct3D11.Device(
+                SharpDX.Direct3D.DriverType.Hardware,
+                SharpDX.Direct3D11.DeviceCreationFlags.BgraSupport);
+            using var dxgi = device.QueryInterface<SharpDX.DXGI.Device>();
+            _adapter = dxgi.Adapter.QueryInterface<SharpDX.DXGI.Adapter3>();
+        }
+        catch
+        {
+            _adapter = null;
+        }
+
         var inputs = _session.InputMetadata.Keys.ToArray();
         _outputName = _session.OutputMetadata.Keys.First();
         _inputName0 = inputs.Contains("img0") ? "img0" : inputs[0];
@@ -272,5 +286,24 @@ public sealed class RifeOnnxEngine : IDisposable
     private static byte ToByte(float value) =>
         (byte)Math.Clamp((int)MathF.Round(value * 255f), 0, 255);
 
-    public void Dispose() => _session.Dispose();
+    /// <summary>Local VRAM in use by this process, in MB, from the same adapter DirectML uses.</summary>
+    public double QueryVramUsedMb()
+    {
+        try
+        {
+            return _adapter is null
+                ? 0
+                : _adapter.QueryVideoMemoryInfo(0, SharpDX.DXGI.MemorySegmentGroup.Local).CurrentUsage / (1024.0 * 1024);
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    public void Dispose()
+    {
+        _adapter?.Dispose();
+        _session.Dispose();
+    }
 }
