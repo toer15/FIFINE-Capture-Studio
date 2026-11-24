@@ -2081,7 +2081,7 @@ public sealed partial class StudioViewModel : ObservableObject
     private void OnFrameArrived(PreviewFrame frame)
     {
         OriginalPreviewImage = frame.Image;
-        _services.FpsMonitor.ObserveCaptureFrame(frame.Image, frame.DecodedAtTicks);
+        _services.FpsMonitor.ObserveCaptureFrame(frame.Image, frame.DecodedAtTicks, _services.Session.MeasuredFps);
 
         // When the enhanced preview is active its worker submits the enhanced pixels instead.
         if (!_services.Enhancement.ShouldEnhancePreview || ShowOriginal)

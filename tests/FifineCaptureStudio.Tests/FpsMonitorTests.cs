@@ -29,6 +29,29 @@ public class FpsMonitorTests
         return pixels;
     }
 
+    private static byte[] SmallMotion(int phase)
+    {
+        var pixels = new byte[W * H * 4];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 32;
+            pixels[i + 1] = 32;
+            pixels[i + 2] = 32;
+            pixels[i + 3] = 255;
+        }
+
+        var x = ((phase % W) + W) % W;
+        for (var y = 0; y < H; y++)
+        {
+            var offset = ((y * W) + x) * 4;
+            pixels[offset] = 255;
+            pixels[offset + 1] = 255;
+            pixels[offset + 2] = 255;
+        }
+
+        return pixels;
+    }
+
     private static byte[] Solid(byte value)
     {
         var pixels = new byte[W * H * 4];
@@ -147,6 +170,24 @@ public class FpsMonitorTests
         Assert.True(paused.Confidence < stable.Confidence);
         Assert.True(Math.Abs(stable.Fps - paused.Fps) < 0.01,
             $"stable={stable.Fps:0.0} ({stable.Confidence:0.00}) paused={paused.Fps:0.0} ({paused.Confidence:0.00}) {paused.Detail}");
+    }
+
+    [Fact]
+    public void Thin_moving_object_is_detected_as_new_frames()
+    {
+        var estimator = new VisualCadenceEstimator();
+        var ticks = 1_000_000L;
+        var phase = 0;
+        for (var i = 0; i < 180; i++)
+        {
+            if (i % 2 == 0) phase++;
+            estimator.Observe(ticks, SmallMotion(phase), 60);
+            ticks += Tick;
+        }
+
+        var reading = estimator.Current;
+        Assert.True(reading.Available, reading.Detail);
+        Assert.InRange(reading.Fps, 29, 31);
     }
 
     [Fact]

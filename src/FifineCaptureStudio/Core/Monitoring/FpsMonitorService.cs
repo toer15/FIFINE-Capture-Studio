@@ -112,12 +112,12 @@ public sealed class FpsMonitorService : IDisposable
         source?.Dispose();
     }
 
-    public void ObserveCaptureFrame(BitmapSource image, long decodedTicks)
+    public void ObserveCaptureFrame(BitmapSource image, long decodedTicks, double streamFps)
     {
         lock (_sampleGate)
         {
             if (!FrameSignatureSampler.TrySample(image, _sample, out _, out _)) return;
-            _cadence.Observe(decodedTicks, _sample);
+            _cadence.Observe(decodedTicks, _sample, streamFps > 1 ? streamFps : 60);
             _lastCaptureTicks = Stopwatch.GetTimestamp();
         }
     }

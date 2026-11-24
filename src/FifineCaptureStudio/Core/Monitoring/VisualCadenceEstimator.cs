@@ -26,6 +26,8 @@ public sealed class VisualCadenceEstimator
     private readonly List<Sample> _samples = new();
     private readonly double[] _previous = new double[TileColumns * TileRows];
     private readonly double[] _current = new double[TileColumns * TileRows];
+    private readonly double[] _previousLuma = new double[Width * Height];
+    private readonly double[] _currentLuma = new double[Width * Height];
     private bool _hasPrevious;
     private long _lastChangeTicks;
     private double _lastStableFps;
@@ -52,6 +54,7 @@ public sealed class VisualCadenceEstimator
         {
             _samples.Clear();
             _hasPrevious = false;
+            Array.Clear(_previousLuma);
             _lastChangeTicks = 0;
             _lastStableFps = 0;
             _lastStableConfidence = 0;
@@ -73,6 +76,7 @@ public sealed class VisualCadenceEstimator
             if (!_hasPrevious)
             {
                 _current.CopyTo(_previous, 0);
+                _currentLuma.CopyTo(_previousLuma, 0);
                 _hasPrevious = true;
                 return;
             }
@@ -88,9 +92,23 @@ public sealed class VisualCadenceEstimator
                 if (delta > TileChangeThreshold) changedTiles++;
             }
 
+            // Tile averages hide a thin moving object: a 2 px line on a 64×36 sample changes a
+            // handful of pixels but barely moves a 4×4 tile average. Per-pixel luma catches that
+            // without treating ±1 codec noise as motion.
+            var changedPixels = 0;
+            var maxPixel = 0.0;
+            for (var i = 0; i < _currentLuma.Length; i++)
+            {
+                var delta = Math.Abs(_currentLuma[i] - _previousLuma[i]);
+                if (delta > maxPixel) maxPixel = delta;
+                if (delta > 6.0) changedPixels++;
+            }
+
             var mean = sum / _current.Length;
-            var changed = changedTiles >= 1 && (mean >= FrameChangeThreshold || maxTile >= StrongTileThreshold);
+            var changed = (changedTiles >= 1 && (mean >= FrameChangeThreshold || maxTile >= StrongTileThreshold)) ||
+                          (changedPixels >= 4 && maxPixel >= 8);
             _current.CopyTo(_previous, 0);
+            _currentLuma.CopyTo(_previousLuma, 0);
 
             // A hard cut invalidates the temporal window; do not count it as a rendered frame.
             if (changedTiles >= 120 && mean >= SceneCutMean)
@@ -209,6 +227,17 @@ public sealed class VisualCadenceEstimator
     {
         const int tileWidth = Width / TileColumns;
         const int tileHeight = Height / TileRows;
+        for (var y = 0; y < Height; y++)
+        {
+            var row = y * Width;
+            for (var x = 0; x < Width; x++)
+            {
+                var offset = (row + x) * 4;
+                // BGRA -> luma. Alpha is ignored because capture overlays can vary it.
+                _currentLuma[row + x] = (0.114 * bgra[offset]) + (0.587 * bgra[offset + 1]) + (0.299 * bgra[offset + 2]);
+            }
+        }
+
         for (var ty = 0; ty < TileRows; ty++)
         {
             for (var tx = 0; tx < TileColumns; tx++)
@@ -219,9 +248,7 @@ public sealed class VisualCadenceEstimator
                     var row = ((ty * tileHeight) + y) * Width;
                     for (var x = 0; x < tileWidth; x++)
                     {
-                        var offset = (row + (tx * tileWidth) + x) * 4;
-                        // BGRA -> luma. Alpha is ignored because capture overlays can vary it.
-                        sum += (0.114 * bgra[offset]) + (0.587 * bgra[offset + 1]) + (0.299 * bgra[offset + 2]);
+                        sum += _currentLuma[row + (tx * tileWidth) + x];
                     }
                 }
 

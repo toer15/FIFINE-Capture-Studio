@@ -308,9 +308,10 @@ later captures.
 
 ### Console and capture video: cadence estimate
 
-Every decoded frame is reduced to a 64×36 BGRA sample and then to 16×9 tile luminance. Mean tile
-deltas, rather than a whole-frame hash, decide whether a visual frame is new: this tolerates codec
-noise and small per-pixel variation while still recognising a duplicated frame. A 240-sample rolling
+Every decoded frame is reduced to a 64×36 BGRA sample. Per-pixel luma changes and 16×9 tile
+luminance are compared, rather than a whole-frame hash: tile motion catches broad changes, while
+per-pixel motion catches a thin moving object that barely shifts a 4×4 tile average. Thresholds
+ignore ±1 codec noise, so a duplicated frame is still recognised. A 240-sample rolling
 window (about 4 s at 60 FPS) gives a new-frame rate, snapped only when it is within 0.65 FPS of a whole
 number. Confidence combines window coverage and first-half/second-half regularity (42% base, up to
 36% coverage and 17% regularity, capped at 95%).
@@ -337,9 +338,9 @@ state and display refresh.
 
 ### Tests and measured results
 
-`FpsMonitorTests` covers 30/40/60-in-60 cadences, repeated frames, codec-sized noise, static scenes,
-scene cuts, PresentMon CSV quoting/BOM, multi-chain primary selection and settings normalisation.
-The full suite is **76 passing**.
+`FpsMonitorTests` covers 30/40/60-in-60 cadences, repeated frames, codec-sized noise, a thin moving
+object on a static scene, static scenes, scene cuts, PresentMon CSV quoting/BOM, multi-chain primary
+selection and settings normalisation. The full suite is **77 passing**.
 
 A live 15 s Performance run with enhancement and the overlay enabled presented **1691 frames at
 119.0 FPS** on the 280 Hz display, with 849 generated frames, 13.87 ms average inference (15.60 ms
