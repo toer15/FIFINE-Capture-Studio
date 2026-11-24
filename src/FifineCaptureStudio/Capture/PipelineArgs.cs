@@ -1,4 +1,5 @@
 using System.Globalization;
+using FifineCaptureStudio.Core.Enhancement;
 using System.IO;
 using FifineCaptureStudio.Core;
 
@@ -45,6 +46,57 @@ public sealed class PipelineOptions
 public static class PipelineArgs
 {
     public const string PreviewPipe = "pipe:1";
+    public const int LightweightPreviewWidth = 1600;
+    public const int MaxEnhancementPreviewWidth = 3840;
+
+    /// <summary>
+    /// Chooses the MJPEG preview width. Enhancement asks for the native frame (capped for 8K
+    /// desktops); everything else keeps the cheap 1600 px stream.
+    /// </summary>
+    public static int ResolvePreviewWidth(int sourceWidth, bool enhancementPreview, bool fullResolution)
+    {
+        if (!enhancementPreview || !fullResolution)
+        {
+            return LightweightPreviewWidth;
+        }
+
+        var width = sourceWidth > 0 ? sourceWidth : 1920;
+        return Math.Min(width, MaxEnhancementPreviewWidth);
+    }
+
+    /// <summary>The size the preview MJPEG stream is encoded at for this option set.</summary>
+    public static (int Width, int Height) EstimatePreviewSize(PipelineOptions options) => PreviewSize(options, 1);
+
+    /// <summary>
+    /// Builds the real GPU filter chain used for enhanced recordings. Frame generation is
+    /// deliberately excluded: generated frames are a presentation feature and never written to disk.
+    /// </summary>
+    public static string BuildRecordingEnhancementFilter(EnhancementSettings e, int width, int height)
+    {
+        if (!e.Enabled || !e.RecordingEnhanced)
+        {
+            return string.Empty;
+        }
+
+        static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+        var builder = new System.Text.StringBuilder();
+        builder.Append("libplacebo=w=").Append(width)
+            .Append(":h=").Append(height)
+            .Append(":upscaler=lanczos:antiringing=0.4")
+            .Append(e.Denoise ? ":deband=true:deband_iterations=2" : ":deband=false")
+            .Append(":brightness=").Append(F(Math.Clamp(e.Brightness, -1, 1)))
+            .Append(":contrast=").Append(F(Math.Clamp(1 + e.Contrast, 0.1, 3)))
+            .Append(":saturation=").Append(F(Math.Clamp(1 + e.Saturation + e.Vibrance * 0.5, 0, 3)))
+            .Append(":gamma=").Append(F(Math.Clamp(1 + e.Gamma, 0.2, 4)));
+
+        if (e.Sharpening > 0.01)
+        {
+            // CAS on the encoder input; the live compute pipeline applies its own sharpen pass.
+            builder.Append(",cas=strength=").Append(F(Math.Clamp(e.Sharpening, 0, 1)));
+        }
+
+        return builder.ToString();
+    }
 
     public static List<string> Build(PipelineOptions options, int previewDivisor = 1)
     {

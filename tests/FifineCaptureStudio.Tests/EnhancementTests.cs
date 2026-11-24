@@ -1,3 +1,4 @@
+using System.IO;
 using FifineCaptureStudio.Capture;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Enhancement;
@@ -109,6 +110,141 @@ public class EnhancementPipelineTests
         var filter = args[args.FindLastIndex(a => a == "-vf") + 1];
 
         Assert.DoesNotContain("minterpolate", filter);
+    }
+}
+
+public class PreviewResolutionTests
+{
+    [Theory]
+    [InlineData(1920, true, true, 1920)]
+    [InlineData(2560, true, true, 2560)]
+    [InlineData(3840, true, true, 3840)]
+    [InlineData(7680, true, true, 3840)]
+    [InlineData(1920, false, true, 1600)]
+    [InlineData(1920, true, false, 1600)]
+    public void Enhancement_asks_for_native_frames_and_plain_preview_stays_light(int source, bool enhancement, bool fullResolution, int expected)
+    {
+        Assert.Equal(expected, PipelineArgs.ResolvePreviewWidth(source, enhancement, fullResolution));
+    }
+}
+
+public class LatestFrameQueueTests
+{
+    [Fact]
+    public void Newest_frame_replaces_a_stale_queued_frame()
+    {
+        using var queue = new LatestFrameQueue<string>();
+
+        Assert.True(queue.Submit("old"));
+        Assert.False(queue.Submit("new"));
+        Assert.Equal(1, queue.Replaced);
+        Assert.Equal(2, queue.Submitted);
+
+        Assert.True(queue.TryTake(out var frame));
+        Assert.Equal("new", frame);
+        Assert.Equal(1, queue.Taken);
+        Assert.False(queue.HasFrame);
+    }
+
+    [Fact]
+    public void Repeated_submissions_cannot_build_a_backlog()
+    {
+        using var queue = new LatestFrameQueue<string>();
+        for (var i = 0; i < 100; i++)
+        {
+            queue.Submit("frame-" + i);
+        }
+
+        Assert.True(queue.TryTake(out var frame));
+        Assert.Equal("frame-99", frame);
+        Assert.False(queue.TryTake(out _));
+        Assert.Equal(99, queue.Replaced);
+    }
+
+    [Fact]
+    public void Take_returns_null_when_nothing_is_queued()
+    {
+        using var queue = new LatestFrameQueue<string>();
+        Assert.False(queue.TryTake(out var frame));
+        Assert.Null(frame);
+    }
+}
+
+public class EnhancementTimingTests
+{
+    [Fact]
+    public void Readback_wait_is_separate_from_gpu_copy_time()
+    {
+        var timings = new EnhancementTimings(1, 2, 3, 4, 5, 6);
+
+        Assert.Equal(15, timings.GpuMs);
+        Assert.Equal(21, timings.TotalMs);
+    }
+
+    [Fact]
+    public void Present_percentiles_use_real_samples()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "fifine-telemetry-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var service = new EnhancementService(new SettingsService(root));
+            var frequency = System.Diagnostics.Stopwatch.Frequency;
+            for (var i = 0; i < 12; i++)
+            {
+                var arrival = System.Diagnostics.Stopwatch.GetTimestamp();
+                service.NotePresented(i, arrival, arrival + frequency / 100);
+            }
+
+            Assert.Equal(12, service.PresentedFrames);
+            Assert.InRange(service.PresentAverageMs, 9.0, 11.0);
+            Assert.InRange(service.PresentP95Ms, 9.0, 60.0);
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); } catch { }
+        }
+    }
+}
+
+public class RecordingFilterTests
+{
+    [Fact]
+    public void Recording_filter_maps_the_live_colour_and_sharpen_settings()
+    {
+        var settings = new EnhancementSettings
+        {
+            Enabled = true,
+            RecordingEnhanced = true,
+            Denoise = true,
+            Brightness = 0.1,
+            Contrast = 0.2,
+            Saturation = 0.3,
+            Vibrance = 0.2,
+            Gamma = -0.1,
+            Sharpening = 0.4
+        };
+
+        var filter = PipelineArgs.BuildRecordingEnhancementFilter(settings, 2560, 1440);
+
+        Assert.Contains("libplacebo=w=2560:h=1440", filter);
+        Assert.Contains("deband=true", filter);
+        Assert.Contains("brightness=0.1", filter);
+        Assert.Contains("contrast=1.2", filter);
+        Assert.Contains("saturation=1.4", filter);
+        Assert.Contains("gamma=0.9", filter);
+        Assert.Contains("cas=strength=0.4", filter);
+        Assert.DoesNotContain("minterpolate", filter);
+    }
+
+    [Fact]
+    public void Recording_filter_is_empty_when_enhanced_recording_is_off()
+    {
+        var settings = new EnhancementSettings { Enabled = true, RecordingEnhanced = false };
+        Assert.Equal(string.Empty, PipelineArgs.BuildRecordingEnhancementFilter(settings, 1920, 1080));
+
+        settings.Enabled = false;
+        settings.RecordingEnhanced = true;
+        Assert.Equal(string.Empty, PipelineArgs.BuildRecordingEnhancementFilter(settings, 1920, 1080));
     }
 }
 

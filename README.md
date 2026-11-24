@@ -167,13 +167,19 @@ capture cards, displays and windows:
   colour grading and Catmull-Rom super resolution with adaptive sharpening.
 * Real source/output resolution reporting (for example 1920 × 1080 → 2560 × 1440), split and
   side-by-side comparison, hold **Tab** to see the untouched signal, and a panic "Disable all" control.
-* GPU timings, VRAM use, processed FPS and dropped frames are measured with Direct3D timestamp queries.
-* Enhanced recordings use a Vulkan/libplacebo filter chain in the existing encoder, never generated frames.
+* The enhancement preview requests the native source frame (up to 3840 px wide) instead of the 1600 px
+  lightweight stream, with an automatic 1600 px fallback if CPU MJPEG decode cannot hold the frame rate.
+  The page shows capture source, enhancement input and enhanced output as separate sizes.
+* GPU timings, VRAM use, source/processed/presented FPS, queue age, dropped frames and an app-level
+  capture-to-present average/p95 are measured; shader time is never reported as total latency.
+* Enhanced recordings use a Vulkan/libplacebo filter chain in the existing encoder, keep the full source
+  resolution, and never contain generated frames.
 * Frame generation is **not** offered: see [docs/ENHANCEMENT.md](docs/ENHANCEMENT.md) for the measured
   numbers and the honest technical reason no fake 2X/3X/4X switch exists.
 
-On the RX 9070 XT the engine measured 3.9 ms per 1440p frame (~255 fps ceiling) and sustained
-59.6 fps during a live 1080p60 capture. Run `FifineCaptureStudio.exe --enhance-bench 180` to reproduce.
+On the RX 9070 XT the engine measured 2.67 ms per native 1080p frame and 4.71 ms per native 1440p frame;
+a live 1080p60 capture with native input sustained 60.1 processed and presented fps at 4.2 ms average
+app-level capture-to-present latency. Run `FifineCaptureStudio.exe --enhance-bench 180` to reproduce.
 
 ## Console streaming
 

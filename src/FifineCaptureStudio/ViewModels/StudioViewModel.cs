@@ -2070,6 +2070,8 @@ public sealed partial class StudioViewModel : ObservableObject
     }
 
     private long _pendingPresentTicks;
+    private long _pendingPresentSequence;
+    private int _pendingPresentEnhanced;
 
     private void OnFrameArrived(PreviewFrame frame)
     {
@@ -2078,7 +2080,9 @@ public sealed partial class StudioViewModel : ObservableObject
         if (_services.Enhancement.ShouldEnhancePreview && !ShowOriginal)
         {
             StartEnhancementWorker();
-            if (!_enhanceQueue.TryAdd(frame.Image))
+            var arrival = new Core.Enhancement.FrameArrival(frame.Sequence, frame.DecodedAtTicks, frame.DecodeMs);
+            // A slower processor replaces the stale queued frame instead of rejecting this fresh one.
+            if (!EnhancementQueue.Submit(new QueuedPreviewFrame(frame.Image, arrival)))
             {
                 _services.Enhancement.NoteDropped();
             }
@@ -2096,8 +2100,11 @@ public sealed partial class StudioViewModel : ObservableObject
         {
             _framePending = 0;
             PreviewImage = frame.Image;
-            // The frame counts as presented once the compositor has drawn it.
+            // The frame counts as presented once the compositor has drawn it. The plain preview
+            // is tracked by the capture session only; enhancement latency samples stay separate.
             Interlocked.Exchange(ref _pendingPresentTicks, frame.DecodedAtTicks);
+            Interlocked.Exchange(ref _pendingPresentSequence, frame.Sequence);
+            Interlocked.Exchange(ref _pendingPresentEnhanced, 0);
             Raise(nameof(ShowNoSignal));
             Raise(nameof(HasPreviewFrame));
         }));
@@ -2106,9 +2113,17 @@ public sealed partial class StudioViewModel : ObservableObject
     private void OnCompositionRendering(object? sender, EventArgs e)
     {
         var ticks = Interlocked.Exchange(ref _pendingPresentTicks, 0);
-        if (ticks != 0)
+        if (ticks == 0)
         {
-            _services.Session.NotePresented(ticks);
+            return;
+        }
+
+        var sequence = Interlocked.Exchange(ref _pendingPresentSequence, 0);
+        var enhanced = Interlocked.Exchange(ref _pendingPresentEnhanced, 0) == 1;
+        _services.Session.NotePresented(ticks);
+        if (enhanced)
+        {
+            _services.Enhancement.NotePresented(sequence, ticks, System.Diagnostics.Stopwatch.GetTimestamp());
         }
     }
 

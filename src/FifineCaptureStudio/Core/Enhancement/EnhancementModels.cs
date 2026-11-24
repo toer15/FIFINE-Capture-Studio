@@ -149,14 +149,21 @@ public sealed record EnhancementConfig
     };
 }
 
+/// <summary>
+/// GPU work measured with timestamp queries plus the CPU-side wait that is not GPU time.
+/// <see cref="ReadbackWaitMs"/> is the wall-clock block inside Map (copy completion), while
+/// <see cref="ReadbackMs"/> is only the GPU copy command itself — they must not be conflated.
+/// </summary>
 public readonly record struct EnhancementTimings(
     double UploadMs,
     double DenoiseMs,
     double ColourMs,
     double UpscaleMs,
-    double ReadbackMs)
+    double ReadbackMs,
+    double ReadbackWaitMs = 0)
 {
-    public double TotalMs => UploadMs + DenoiseMs + ColourMs + UpscaleMs + ReadbackMs;
+    public double GpuMs => UploadMs + DenoiseMs + ColourMs + UpscaleMs + ReadbackMs;
+    public double TotalMs => GpuMs + ReadbackWaitMs;
 }
 
 public sealed record EnhancedFrame(

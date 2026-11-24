@@ -41,6 +41,12 @@ public sealed class EnhancementSettings
     // Output routing
     public bool PreviewEnhanced { get; set; } = true;
     public bool FullscreenEnhanced { get; set; } = true;
+
+    /// <summary>
+    /// Request the capture pipeline's native frame size for enhancement instead of the 1600 px
+    /// lightweight preview. Turned off automatically (and persisted) when decode cannot keep up.
+    /// </summary>
+    public bool FullResolutionPreview { get; set; } = true;
     public bool RecordingEnhanced { get; set; }
     public ComparisonMode Comparison { get; set; } = ComparisonMode.Single;
     public string HoldOriginalShortcut { get; set; } = "Tab";

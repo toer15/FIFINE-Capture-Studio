@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -15,8 +14,12 @@ public sealed record EnhancementOption<T>(T Value, string Label)
 
 public sealed partial class StudioViewModel
 {
-    private readonly BlockingCollection<BitmapSource> _enhanceQueue = new(new ConcurrentQueue<BitmapSource>(), 1);
+    private LatestFrameQueue<QueuedPreviewFrame>? _enhanceQueue;
+    private CancellationTokenSource? _enhanceCts;
     private Task? _enhanceWorker;
+
+    /// <summary>One decoded preview frame plus the boundaries the worker needs for telemetry.</summary>
+    private sealed record QueuedPreviewFrame(BitmapSource Image, FrameArrival Arrival);
     private BitmapSource? _originalPreviewImage;
     private bool _showOriginal;
     private bool _quickPanelOpen;
@@ -58,8 +61,12 @@ public sealed partial class StudioViewModel
         get => Config.Enhancement.Enabled;
         set
         {
+            if (Config.Enhancement.Enabled == value) return;
             Config.Enhancement.Enabled = value;
             SaveEnhancement();
+            // The preview size is baked into the FFmpeg arguments: enabling enhancement must rebuild
+            // the pipeline so native frames reach the engine instead of the light 1600 px stream.
+            _ = RestartForEnhancementChangeAsync();
         }
     }
 
@@ -192,7 +199,32 @@ public sealed partial class StudioViewModel
     public bool PreviewEnhanced
     {
         get => Config.Enhancement.PreviewEnhanced;
-        set { Config.Enhancement.PreviewEnhanced = value; SaveEnhancement(); }
+        set
+        {
+            if (Config.Enhancement.PreviewEnhanced == value) return;
+            Config.Enhancement.PreviewEnhanced = value;
+            SaveEnhancement();
+            _services.Session.RequestFullResolutionPreview();
+            _ = RestartForEnhancementChangeAsync();
+        }
+    }
+
+    /// <summary>
+    /// Requests the capture pipeline's native frame size for the enhancement engine. Turning this
+    /// off keeps the lightweight 1600 px preview. Auto-downgraded by CaptureSession when CPU MJPEG
+    /// decoding cannot sustain the source frame rate.
+    /// </summary>
+    public bool FullResolutionPreview
+    {
+        get => Config.Enhancement.FullResolutionPreview;
+        set
+        {
+            if (Config.Enhancement.FullResolutionPreview == value) return;
+            Config.Enhancement.FullResolutionPreview = value;
+            SaveEnhancement();
+            _services.Session.RequestFullResolutionPreview();
+            _ = RestartForEnhancementChangeAsync();
+        }
     }
 
     public bool FullscreenEnhanced
@@ -322,6 +354,95 @@ public sealed partial class StudioViewModel
         : _services.Enhancement.VramUsedMb.ToString("0") + " MB";
     public string EnhancementProcessedText => _services.Enhancement.ProcessedFrames.ToString("N0");
     public string EnhancementDroppedText => _services.Enhancement.DroppedFrames.ToString("N0");
+
+    public string EnhancementInputResolutionText
+    {
+        get
+        {
+            var enhanced = _services.Enhancement.ShouldEnhancePreview;
+            var w = enhanced ? _services.Enhancement.LastInputWidth : 0;
+            var h = enhanced ? _services.Enhancement.LastInputHeight : 0;
+            if (w <= 0)
+            {
+                w = _services.Session.ActivePreviewWidth;
+                h = _services.Session.ActivePreviewHeight;
+            }
+
+            return w > 0 ? $"{w} × {h}" : "—";
+        }
+    }
+
+    public string EnhancementInputNote
+    {
+        get
+        {
+            if (!EnhancementEnabled)
+            {
+                return "Enhancement is off — the preview stays on the lightweight 1600 px stream.";
+            }
+
+            var source = _services.Session.ActiveSourceWidth;
+            var input = _services.Session.ActivePreviewWidth;
+            if (source > 0 && input >= source && input > 1600)
+            {
+                return $"Native {input} px frames enter the GPU engine; decode stays on the FFmpeg MJPEG transport.";
+            }
+
+            if (input > 1600)
+            {
+                return $"The enhancement engine receives {input} px frames (capture source {source} px).";
+            }
+
+            return "The enhancement engine receives the lightweight 1600 px preview; recording keeps the full source size. " +
+                   "Enable full-resolution input when this GPU and source can decode native frames at the capture frame rate.";
+        }
+    }
+
+    public string EnhancementSourceFpsText => _services.Session.MeasuredFps <= 0
+        ? "—"
+        : _services.Session.MeasuredFps.ToString("0.0") + " fps";
+
+    public string EnhancementProcessedFpsText => _services.Enhancement.MeasuredFps <= 0
+        ? "—"
+        : _services.Enhancement.MeasuredFps.ToString("0.0") + " fps";
+
+    public string EnhancementPresentedFpsText => _services.Enhancement.PresentedFps <= 0
+        ? "—"
+        : _services.Enhancement.PresentedFps.ToString("0.0") + " fps";
+
+    public string EnhancementQueueAgeText => _services.Enhancement.QueueAgeMs <= 0
+        ? "—"
+        : _services.Enhancement.QueueAgeMs.ToString("0.0") + " ms";
+
+    public string EnhancementDecodeText => _services.Enhancement.DecodeMs <= 0
+        ? "—"
+        : _services.Enhancement.DecodeMs.ToString("0.00") + " ms";
+
+    public string EnhancementGpuText => _services.Enhancement.AverageFrameMs <= 0
+        ? "—"
+        : (_services.Enhancement.AverageFrameMs - _services.Enhancement.ReadbackWaitMs).ToString("0.00") + " ms";
+
+    public string EnhancementTotalText => _services.Enhancement.AverageFrameMs <= 0
+        ? "—"
+        : _services.Enhancement.AverageFrameMs.ToString("0.00") + " ms";
+
+    public string EnhancementPresentLatencyText
+    {
+        get
+        {
+            var svc = _services.Enhancement;
+            if (svc.PresentSampleCount < 8 || svc.PresentAverageMs <= 0)
+            {
+                return "—";
+            }
+
+            return $"{svc.PresentAverageMs:0.0} ms avg · {svc.PresentP95Ms:0.0} ms p95";
+        }
+    }
+
+    public string EnhancementLatencyBoundaryText =>
+        "Decode-complete → compositor present, measured in-app. Shader time is GPU work only. " +
+        "Camera, capture-card and display scan-out delay are outside this measurement.";
 
     public string EnhancementBadgeText
     {
@@ -498,6 +619,17 @@ public sealed partial class StudioViewModel
         Raise(nameof(EnhancementBadgeVisible));
         Raise(nameof(EnhancementSourceResolutionText));
         Raise(nameof(EnhancementOutputResolutionText));
+        Raise(nameof(EnhancementInputResolutionText));
+        Raise(nameof(EnhancementInputNote));
+        Raise(nameof(EnhancementSourceFpsText));
+        Raise(nameof(EnhancementProcessedFpsText));
+        Raise(nameof(EnhancementPresentedFpsText));
+        Raise(nameof(EnhancementQueueAgeText));
+        Raise(nameof(EnhancementDecodeText));
+        Raise(nameof(EnhancementGpuText));
+        Raise(nameof(EnhancementTotalText));
+        Raise(nameof(EnhancementPresentLatencyText));
+        Raise(nameof(FullResolutionPreview));
     }
 
     // ------------------------------------------------------------------ frame routing
@@ -510,21 +642,43 @@ public sealed partial class StudioViewModel
         private set => Set(ref _originalPreviewImage, value);
     }
 
+    private LatestFrameQueue<QueuedPreviewFrame> EnhancementQueue => _enhanceQueue ??= new LatestFrameQueue<QueuedPreviewFrame>();
+
     private void StartEnhancementWorker()
     {
-        if (_enhanceWorker is not null)
+        if (_enhanceWorker is { IsCompleted: false })
         {
             return;
         }
 
-        _enhanceWorker = Task.Run(() =>
+        var queue = EnhancementQueue;
+        _enhanceCts?.Dispose();
+        _enhanceCts = new CancellationTokenSource();
+        var token = _enhanceCts.Token;
+
+        _enhanceWorker = Task.Run(async () =>
         {
-            foreach (var frame in _enhanceQueue.GetConsumingEnumerable())
+            while (!token.IsCancellationRequested)
             {
+                QueuedPreviewFrame? item;
+                try
+                {
+                    item = await queue.TakeAsync(token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                if (item is null)
+                {
+                    continue;
+                }
+
                 EnhancedFrame? result = null;
                 try
                 {
-                    result = _services.Enhancement.Process(frame);
+                    result = _services.Enhancement.Process(item.Image, item.Arrival);
                 }
                 catch (Exception ex)
                 {
@@ -534,9 +688,10 @@ public sealed partial class StudioViewModel
                 _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
                 {
                     _framePending = 0;
-                    if (result is not null)
+                    var presented = result is not null;
+                    if (presented)
                     {
-                        _enhancedPreviewImage = result.ToBitmap();
+                        _enhancedPreviewImage = result!.ToBitmap();
                         if (!ShowOriginal)
                         {
                             PreviewImage = _enhancedPreviewImage;
@@ -544,8 +699,14 @@ public sealed partial class StudioViewModel
                     }
                     else if (!ShowOriginal)
                     {
-                        PreviewImage = frame;
+                        PreviewImage = item.Image;
                     }
+
+                    // The compositor paints this frame on the next rendering pass, which is the
+                    // presentation boundary for capture-to-preview latency.
+                    Interlocked.Exchange(ref _pendingPresentTicks, item.Arrival.ArrivalTicks);
+                    Interlocked.Exchange(ref _pendingPresentSequence, item.Arrival.Sequence);
+                    Interlocked.Exchange(ref _pendingPresentEnhanced, presented ? 1 : 0);
 
                     Raise(nameof(ShowNoSignal));
                     Raise(nameof(HasPreviewFrame));
@@ -557,7 +718,8 @@ public sealed partial class StudioViewModel
 
     private void StopEnhancementWorker()
     {
-        _enhanceQueue.CompleteAdding();
+        _enhanceCts?.Cancel();
+        _enhanceQueue?.Complete();
         _enhanceWorker = null;
     }
 

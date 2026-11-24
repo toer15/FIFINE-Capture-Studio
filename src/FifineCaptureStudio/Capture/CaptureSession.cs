@@ -70,6 +70,10 @@ public sealed class CaptureSession : IAsyncDisposable
     private volatile bool _expectExit;
     private int _reconnectAttempts;
     private bool _paused;
+    private bool _previewFullResolution = true;
+    private double _avgDecodeMs;
+    private int _slowDecodeFrames;
+    private bool _previewFallbackApplied;
     private DateTime _lastFrameAt = DateTime.MinValue;
     private long _lastDecodeTicks;
     private DateTime _lastFrameWall = DateTime.MinValue;
@@ -126,6 +130,13 @@ public sealed class CaptureSession : IAsyncDisposable
     public long FramesDecoded => _framesSeen;
     public int ActiveSourceWidth => _activeOptions?.Source.Width ?? 0;
     public int ActiveSourceHeight => _activeOptions?.Source.Height ?? 0;
+
+    /// <summary>Size of the frames FFmpeg actually hands to the enhancement engine.</summary>
+    public int ActivePreviewWidth => _activeOptions is null ? 0 : PipelineArgs.EstimatePreviewSize(_activeOptions).Width;
+    public int ActivePreviewHeight => _activeOptions is null ? 0 : PipelineArgs.EstimatePreviewSize(_activeOptions).Height;
+    public bool PreviewAtNativeResolution => ActivePreviewWidth > 0
+                                             && ActivePreviewWidth >= ActiveSourceWidth
+                                             && ActivePreviewWidth > 1600;
     public int ActiveOutputWidth => _activeOptions?.EncodeWidth ?? 0;
     public int ActiveOutputHeight => _activeOptions?.EncodeHeight ?? 0;
     public double RecordingFps => _run?.Fps ?? 0;
@@ -856,11 +867,20 @@ public sealed class CaptureSession : IAsyncDisposable
             _ => EstimateBitrate(width, height, s.Recording.Fps, s.Recording.QualityPreset)
         };
 
+        // Enhancement wants the native frame; plain preview keeps the cheap 1600 px MJPEG stream.
+        // The native path is capped at 3840 px wide so an 8K desktop capture cannot turn the
+        // MJPEG transport into a multi-hundred-megabyte-per-second firehose.
+        var enhancementPreview = s.Enhancement.Enabled && s.Enhancement.PreviewEnhanced;
+        var previewWidth = PipelineArgs.ResolvePreviewWidth(
+            source.Width,
+            enhancementPreview,
+            _previewFullResolution && s.Enhancement.FullResolutionPreview);
+
         var replayEnabled = s.Replay.Enabled;
         return new PipelineOptions
         {
             Source = source,
-            PreviewWidth = 1600,
+            PreviewWidth = previewWidth,
             PreviewEnabled = true,
             MeasureLatency = false,
             RecordPath = recordPath,
@@ -881,44 +901,13 @@ public sealed class CaptureSession : IAsyncDisposable
             AudioSampleRate = s.Audio.SampleRate,
             Latency = s.LowLatency.Mode,
             VideoBufferMs = s.LowLatency.VideoBufferMs,
-            EnhancementFilter = BuildRecordingEnhancementFilter(s, Even(width), Even(height)),
+            EnhancementFilter = PipelineArgs.BuildRecordingEnhancementFilter(s.Enhancement, Even(width), Even(height)),
             ConsoleVideoPipe = source.Kind == CaptureSourceKind.ConsoleStream ? _console.VideoPipePath ?? string.Empty : string.Empty,
             ConsoleCodec = s.PlayStation.PreferHevc && s.PlayStation.IsPs5 ? "hevc" : "h264"
         };
     }
 
     private static int Even(int value) => value - (value % 2);
-
-    /// <summary>
-    /// Builds the real GPU filter chain used for enhanced recordings. Frame generation is
-    /// deliberately excluded: generated frames are a presentation feature and never written to disk.
-    /// </summary>
-    private static string BuildRecordingEnhancementFilter(AppSettings s, int width, int height)
-    {
-        var e = s.Enhancement;
-        if (!e.Enabled || !e.RecordingEnhanced)
-        {
-            return string.Empty;
-        }
-
-        static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
-        var builder = new System.Text.StringBuilder();
-        builder.Append("libplacebo=w=").Append(width)
-            .Append(":h=").Append(height)
-            .Append(":upscaler=lanczos:antiringing=0.4")
-            .Append(e.Denoise ? ":deband=true:deband_iterations=2" : ":deband=false")
-            .Append(":brightness=").Append(F(Math.Clamp(e.Brightness, -1, 1)))
-            .Append(":contrast=").Append(F(Math.Clamp(1 + e.Contrast, 0.1, 3)))
-            .Append(":saturation=").Append(F(Math.Clamp(1 + e.Saturation + e.Vibrance * 0.5, 0, 3)))
-            .Append(":gamma=").Append(F(Math.Clamp(1 + e.Gamma, 0.2, 4)));
-
-        if (e.Sharpening > 0.01)
-        {
-            builder.Append(",cas=strength=").Append(F(Math.Clamp(e.Sharpening, 0, 1)));
-        }
-
-        return builder.ToString();
-    }
 
     public static int EstimateBitrate(int width, int height, int fps, string preset)
     {
@@ -1134,6 +1123,7 @@ public sealed class CaptureSession : IAsyncDisposable
         }
 
         _decodeMs = frame.DecodeMs;
+        TrackPreviewDecodeLoad(frame.DecodeMs);
         _framesSeen++;
         _fpsWindowFrames++;
         PreviewStartedAt = PreviewStartedAt == DateTime.MaxValue ? now : PreviewStartedAt;
@@ -1153,6 +1143,60 @@ public sealed class CaptureSession : IAsyncDisposable
     {
         var ms = (Stopwatch.GetTimestamp() - decodedTicks) * 1000.0 / Stopwatch.Frequency;
         _presentLatencyMs = _presentLatencyMs <= 0 ? ms : (_presentLatencyMs * 0.85) + (ms * 0.15);
+    }
+
+    /// <summary>Lets a user re-request native enhancement input after an automatic downgrade.</summary>
+    public void RequestFullResolutionPreview()
+    {
+        _previewFullResolution = true;
+        _previewFallbackApplied = false;
+        _slowDecodeFrames = 0;
+        _avgDecodeMs = 0;
+    }
+
+    /// <summary>
+    /// Watches MJPEG decode cost when the enhancement preview runs above 1600 px. Decoding a 1080p
+    /// or 1440p JPEG on the CPU is the new bottleneck of this transport; when it cannot hold the
+    /// source frame budget the preview drops back to the lightweight size instead of building delay.
+    /// Recording and the encoded output always keep their full resolution.
+    /// </summary>
+    private void TrackPreviewDecodeLoad(double decodeMs)
+    {
+        if (_activeOptions is null || _previewFallbackApplied || !_settings.Current.Enhancement.Enabled)
+        {
+            return;
+        }
+
+        if (ActivePreviewWidth <= 1600 || decodeMs <= 0)
+        {
+            return;
+        }
+
+        _avgDecodeMs = _avgDecodeMs <= 0 ? decodeMs : (_avgDecodeMs * 0.95) + (decodeMs * 0.05);
+        var fps = Math.Max(24, _settings.Current.Capture.Fps);
+        var budget = 1000.0 / fps;
+        if (_avgDecodeMs < Math.Max(4.0, budget * 0.45))
+        {
+            _slowDecodeFrames = 0;
+            return;
+        }
+
+        if (++_slowDecodeFrames < 90)
+        {
+            return;
+        }
+
+        _previewFallbackApplied = true;
+        _previewFullResolution = false;
+        _settings.Current.Enhancement.FullResolutionPreview = false;
+        _settings.SaveSoon();
+        var width = ActivePreviewWidth;
+        Notice?.Invoke(
+            $"Decoding {width} px MJPEG frames averaged {_avgDecodeMs:0.0} ms, which cannot hold {fps} fps here. " +
+            "The enhancement preview returned to 1600 px; the recording and encoded output keep the full source resolution.",
+            true);
+
+        _ = Task.Run(RestartPreviewAsync);
     }
 
     private void OnProcessExited(object? sender, EventArgs e)

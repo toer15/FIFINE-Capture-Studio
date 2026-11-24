@@ -169,7 +169,11 @@ public sealed class EnhancementEngine : IDisposable
             _context.End(_t4!);
             _context.End(_disjoint!);
 
+            // Map blocks until the GPU copy has completed. That wait is real presentation latency but
+            // it is not shader work, so it is measured separately from the GPU-side copy timestamp.
+            var readbackWait = Stopwatch.StartNew();
             var pixels = Readback();
+            readbackWait.Stop();
             var (denoiseMs, gradeMs, upscaleMs, readbackMs) = ReadGpuTimings(uploadMs);
 
             return new EnhancedFrame(
@@ -179,7 +183,7 @@ public sealed class EnhancementEngine : IDisposable
                 source.PixelHeight,
                 outWidth,
                 outHeight,
-                new EnhancementTimings(uploadMs, denoiseMs, gradeMs, upscaleMs, readbackMs),
+                new EnhancementTimings(uploadMs, denoiseMs, gradeMs, upscaleMs, readbackMs, readbackWait.Elapsed.TotalMilliseconds),
                 true);
         }
     }

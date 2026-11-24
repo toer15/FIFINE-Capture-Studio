@@ -261,19 +261,31 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="ORIGINAL SOURCE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="CAPTURE SOURCE" Style="{StaticResource MetricLabel}" />
                                     <TextBlock Text="{Binding EnhancementSourceResolutionText}" Style="{StaticResource MetricValue}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
+                                    <TextBlock Text="ENHANCEMENT INPUT" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementInputResolutionText}" Style="{StaticResource MetricValue}"
+                                               Foreground="{StaticResource Amber}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
                                     <TextBlock Text="ENHANCED OUTPUT" Style="{StaticResource MetricLabel}" />
                                     <TextBlock Text="{Binding EnhancementOutputResolutionText}" Style="{StaticResource MetricValue}"
                                                Foreground="{StaticResource Cyan}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
-                        <TextBlock Text="{Binding EnhancementOutputNote}" Style="{StaticResource SectionHint}" Margin="0,8,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding FullResolutionPreview, Mode=TwoWay}"
+                                          VerticalAlignment="Center" />
+                            <TextBlock Text="Full-resolution enhancement input" Style="{StaticResource SliderLabel}" Margin="10,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding EnhancementInputNote}" Style="{StaticResource SectionHint}" Margin="0,6,0,0" />
+                        <TextBlock Text="{Binding EnhancementOutputNote}" Style="{StaticResource SectionHint}" Margin="0,6,0,0" />
                     </StackPanel>
                 </Border>
 
@@ -446,13 +458,43 @@
                             <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,0,5,5">
                                 <StackPanel>
                                     <TextBlock Text="PROCESSED" Style="{StaticResource MetricLabel}" />
-                                    <TextBlock Text="{Binding EnhancementFpsText}" Style="{StaticResource MetricValue}" />
+                                    <TextBlock Text="{Binding EnhancementProcessedFpsText}" Style="{StaticResource MetricValue}" />
                                 </StackPanel>
                             </Border>
                             <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,0,0,5">
                                 <StackPanel>
-                                    <TextBlock Text="FRAME TIME" Style="{StaticResource MetricLabel}" />
-                                    <TextBlock Text="{Binding EnhancementFrameTimeText}" Style="{StaticResource MetricValue}" />
+                                    <TextBlock Text="PRESENTED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementPresentedFpsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="SOURCE FPS" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementSourceFpsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,5,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="QUEUE AGE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementQueueAgeText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="DECODE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementDecodeText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,5,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="GPU SHADER" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementGpuText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="FRAME TOTAL" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementTotalText}" Style="{StaticResource MetricValue}" />
                                 </StackPanel>
                             </Border>
                             <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
@@ -492,6 +534,15 @@
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
+
+                        <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,8,0,0">
+                            <StackPanel>
+                                <TextBlock Text="CAPTURE → PRESENT (APP-LEVEL)" Style="{StaticResource MetricLabel}" />
+                                <TextBlock Text="{Binding EnhancementPresentLatencyText}" Style="{StaticResource MetricValue}"
+                                           Foreground="{StaticResource Cyan}" />
+                                <TextBlock Text="{Binding EnhancementLatencyBoundaryText}" Style="{StaticResource SectionHint}" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Text="Recording output" Style="{StaticResource SectionTitle}" Margin="0,14,0,0" />
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
