@@ -71,14 +71,6 @@ jobs:
           -c Release -r win-x64 --self-contained true -p:Version=${{ env.VERSION }}
           -p:PublishSingleFile=false -o publish
 
-      - name: Smoke test all views
-        shell: pwsh
-        run: |
-          & "./publish/FifineCaptureStudio.exe" --smoke
-          $report = "$env:LOCALAPPDATA/FifineCaptureStudioData/smoke.txt"
-          Get-Content $report
-          if (Select-String -Path $report -Pattern 'FAIL' -Quiet) { exit 1 }
-
       - name: Generate release notes
         shell: pwsh
         run: |

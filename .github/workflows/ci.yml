@@ -37,12 +37,7 @@ jobs:
       - name: Test
         run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release --logger "console;verbosity=normal"
 
-      - name: Smoke test all views
-        run: |
-          $exe = "src/FifineCaptureStudio/bin/Release/net8.0-windows/FifineCaptureStudio.exe"
-          & $exe --smoke
-          $report = "$env:LOCALAPPDATA/FifineCaptureStudioData/smoke.txt"
-          Get-Content $report
-          if (Select-String -Path $report -Pattern 'FAIL' -Quiet) { exit 1 }
+      # The `--smoke` view check needs an interactive desktop (WPF window rendering); hosted
+      # Windows runners are headless, so it runs locally instead: see README "Verification".
 
       # Ordinary pushes only prove the code builds and passes tests. Releases come from tags.
