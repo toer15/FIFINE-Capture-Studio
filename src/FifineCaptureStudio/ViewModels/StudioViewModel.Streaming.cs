@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using FifineCaptureStudio.Core;
+using FifineCaptureStudio.Core.Streaming.Nixani;
 using FifineCaptureStudio.Core.Streaming;
 
 namespace FifineCaptureStudio.ViewModels;
@@ -187,6 +188,53 @@ public sealed partial class StudioViewModel
 
         return false;
     }
+
+    /// <summary>
+    /// Sends the local controller to the console while streaming. The pad is only forwarded during
+    /// a live session, so input never goes anywhere else.
+    /// </summary>
+    public void ForwardLocalController(ControllerState state)
+    {
+        if (!_services.PlayStation.IsStreaming || !Config.PlayStation.ForwardController)
+        {
+            return;
+        }
+
+        if (!state.Connected)
+        {
+            _services.PlayStation.SendPad(NixaniPadState.Idle);
+            return;
+        }
+
+        uint buttons = 0;
+        if (state.Up) buttons |= 1u << 0;
+        if (state.Down) buttons |= 1u << 1;
+        if (state.Left) buttons |= 1u << 2;
+        if (state.Right) buttons |= 1u << 3;
+        if (state.A) buttons |= 1u << 4;
+        if (state.B) buttons |= 1u << 5;
+        if (state.X) buttons |= 1u << 6;
+        if (state.Y) buttons |= 1u << 7;
+        if (state.LeftBumper) buttons |= 1u << 8;
+        if (state.RightBumper) buttons |= 1u << 9;
+        if (state.LeftStickButton) buttons |= 1u << 10;
+        if (state.RightStickButton) buttons |= 1u << 11;
+        if (state.Back) buttons |= 1u << 12;
+        if (state.Start) buttons |= 1u << 13;
+        if (state.Guide) buttons |= 1u << 15;
+
+        _services.PlayStation.SendPad(new NixaniPadState(
+            buttons,
+            (byte)Math.Clamp(state.LeftTrigger * 255, 0, 255),
+            (byte)Math.Clamp(state.RightTrigger * 255, 0, 255),
+            ToAxis(state.LeftX),
+            ToAxis(-state.LeftY),
+            ToAxis(state.RightX),
+            ToAxis(-state.RightY)));
+    }
+
+    private static short ToAxis(float value) =>
+        (short)Math.Clamp(Math.Round(value * 32767f), -32768, 32767);
 
     public void RaiseConsoleState()
     {

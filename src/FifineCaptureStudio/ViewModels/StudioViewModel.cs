@@ -874,6 +874,7 @@ public sealed partial class StudioViewModel : ObservableObject
             await StartCaptureAsync();
         }
 
+        _services.Controllers.StateChanged += ForwardLocalController;
         _uiTimer.Start();
         RaiseAllSettings();
         InitializeUpdates();

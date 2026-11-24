@@ -33,6 +33,9 @@ PS5 / PS4  ──Remote Play──▶  nixani-engine.exe  ──stdin/stdout pro
 * **Audio** — `Audio` messages carry interleaved 16-bit PCM; `AudioEngine.PushConsolePcm` mixes it
   into the same mixer as game/capture/mic audio, so monitoring and recording (including separate
   tracks) include console sound.
+* **Controller** — while streaming, the local controller (XInput or Sony HID) is mapped to the engine's
+  `Pad` message: d-pad, face buttons, bumpers, sticks, triggers, share/options/PS. Forwarding stops
+  when the session ends. Haptics/rumble from the console are received by the client but not yet played.
 * **Statistics** — `Stats` messages (packets received/lost, RTT, FEC failures, keyframe requests) are
   shown as reported; nothing is invented. Frame rate and latency come from the decoder/preview, not
   from a timer.
