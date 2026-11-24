@@ -601,6 +601,12 @@ public sealed class AudioEngine : IDisposable
     private PcmPipeSink? _mixedSink;
     private bool _separateTracks;
 
+    // Console streaming audio (delivered as PCM by the console backend) is mixed like a channel.
+    private readonly object _consoleGate = new();
+    private readonly float[] _consoleRing = new float[2 * 48000 * 4];
+    private int _consoleCount;
+    private int _consoleRate;
+
     public AudioEngine(SettingsService settings)
     {
         _settings = settings;
@@ -612,6 +618,9 @@ public sealed class AudioEngine : IDisposable
     public string? LastError { get; private set; }
     public int SampleRate => _settings.Current.Audio.SampleRate;
     public double MonitorLagMs { get; private set; } = -1;
+    public double ConsoleLevel { get; private set; }
+    public long ConsoleSamplesReceived { get; private set; }
+    public bool HasConsoleAudio => _consoleCount > 0;
 
     public event Action? MetersUpdated;
     public event Action<string>? StatusChanged;
@@ -720,6 +729,62 @@ public sealed class AudioEngine : IDisposable
         IsMonitoring = false;
     }
 
+    /// <summary>
+    /// Adds interleaved 16-bit PCM from a console stream to the mixer. The backend delivers
+    /// 48 kHz stereo; other rates are resampled on the mixer thread.
+    /// </summary>
+    public void PushConsolePcm(byte[] pcm16, int channels, int sampleRate)
+    {
+        if (pcm16.Length < 4)
+        {
+            return;
+        }
+
+        channels = Math.Clamp(channels, 1, 2);
+        sampleRate = Math.Max(8000, sampleRate);
+        var samples = pcm16.Length / 2;
+        var frames = samples / channels;
+
+        lock (_consoleGate)
+        {
+            if (sampleRate != _consoleRate)
+            {
+                _consoleRate = sampleRate;
+                _consoleCount = 0;
+            }
+
+            var needed = frames * 2;
+            if (_consoleCount + needed > _consoleRing.Length)
+            {
+                var drop = Math.Min(_consoleCount, _consoleCount + needed - _consoleRing.Length);
+                drop -= drop % 2;
+                Array.Copy(_consoleRing, drop, _consoleRing, 0, _consoleCount - drop);
+                _consoleCount -= drop;
+            }
+
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var left = BitConverter.ToInt16(pcm16, frame * channels * 2) / 32768f;
+                var right = channels == 2
+                    ? BitConverter.ToInt16(pcm16, ((frame * channels) + 1) * 2) / 32768f
+                    : left;
+                _consoleRing[_consoleCount++] = left;
+                _consoleRing[_consoleCount++] = right;
+            }
+        }
+
+        ConsoleSamplesReceived += frames;
+    }
+
+    public void ClearConsoleAudio()
+    {
+        lock (_consoleGate)
+        {
+            _consoleCount = 0;
+            ConsoleLevel = 0;
+        }
+    }
+
     private void Mix()
     {
         if (!IsRunning || Interlocked.Exchange(ref _mixing, 1) == 1)
@@ -768,6 +833,11 @@ public sealed class AudioEngine : IDisposable
                         AddInto(_monitorMix, _channelScratch, frames);
                     }
                 }
+
+                AddConsoleInto(_channelScratch, frames);
+                AddInto(_mixAll, _channelScratch, frames);
+                AddInto(_mixGame, _channelScratch, frames);
+                AddInto(_monitorMix, _channelScratch, frames);
             }
 
             if (IsMonitoring && _monitorBuffer is not null)
@@ -812,6 +882,54 @@ public sealed class AudioEngine : IDisposable
         finally
         {
             Interlocked.Exchange(ref _mixing, 0);
+        }
+    }
+
+    /// <summary>Renders the console PCM ring into the scratch buffer for this mixer tick.</summary>
+    private void AddConsoleInto(float[] destination, int frames)
+    {
+        var count = frames * 2;
+        Array.Clear(destination, 0, count);
+
+        lock (_consoleGate)
+        {
+            if (_consoleCount <= 0)
+            {
+                ConsoleLevel = 0;
+                return;
+            }
+
+            var rate = _consoleRate <= 0 ? SampleRate : _consoleRate;
+            var sourceFrames = _consoleCount / 2;
+            var ratio = rate / (double)SampleRate;
+
+            for (var i = 0; i < frames; i++)
+            {
+                var sourceIndex = ratio == 1.0 ? i : (int)(i * ratio);
+                if (sourceIndex >= sourceFrames)
+                {
+                    break;
+                }
+
+                destination[i * 2] = _consoleRing[sourceIndex * 2];
+                destination[(i * 2) + 1] = _consoleRing[(sourceIndex * 2) + 1];
+            }
+
+            var consumedFrames = Math.Min(sourceFrames, (int)Math.Ceiling(frames * ratio));
+            var consumed = Math.Min(_consoleCount, consumedFrames * 2);
+            if (consumed > 0)
+            {
+                Array.Copy(_consoleRing, consumed, _consoleRing, 0, _consoleCount - consumed);
+                _consoleCount -= consumed;
+            }
+
+            double sum = 0;
+            for (var i = 0; i < count; i++)
+            {
+                sum += destination[i] * destination[i];
+            }
+
+            ConsoleLevel = Math.Sqrt(sum / count);
         }
     }
 

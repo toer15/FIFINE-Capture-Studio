@@ -157,6 +157,31 @@ Capture card USB  →  PC USB 3 port
 Switch HDCP off on the console (Settings → System → HDMI) or the card will show a
 protected-signal message. The app never tries to strip HDCP.
 
+## Console streaming
+
+PlayStation gameplay can now arrive over the network instead of HDMI. FIFINE starts the
+[Nixani Engine](https://github.com/Nixani/nixani-engine) (chiaki-ng's `libchiaki` behind a
+stdin/stdout protocol) as a **separate, window-less process**, registers with the console using the
+8-digit code the PS5/PS4 displays, and receives the real H.264/HEVC access units and PCM audio.
+
+```
+PS5 ──Remote Play──▶ nixani-engine.exe ──stdio protocol v3──▶ FIFINE ──named pipe──▶ FFmpeg
+                                                                                    ├─ preview (MJPEG)
+                                                                                    └─ recording / replay
+```
+
+* Discovery, registration, session start/stop, controller updates, keyframe requests and every
+  engine message are implemented in `Core/Streaming/Nixani/`.
+* Video is fed to the **existing** pipeline through a Windows named pipe, so preview, fullscreen,
+  replay buffer, recording, encoder selection and statistics all work unchanged; audio is mixed into
+  the same Audio Studio mixer.
+* Registration keys and account data are DPAPI-protected per Windows user.
+* The engine is AGPL-3.0 and is **not** bundled or downloaded — build it and point FIFINE at it in
+  Gaming Sources → PlayStation Remote Play. See [docs/CONSOLE-STREAMING.md](docs/CONSOLE-STREAMING.md)
+  and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+* Xbox home streaming is WebRTC-based and neither Greenlight nor xbox-xcloud-player can be embedded as
+  a library, so no Xbox network video path is shipped; HDMI capture remains the Xbox path.
+
 ## Automatic updates
 
 FIFINE Capture Studio ships through GitHub Releases and updates itself with

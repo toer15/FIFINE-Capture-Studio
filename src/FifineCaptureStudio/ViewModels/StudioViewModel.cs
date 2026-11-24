@@ -123,6 +123,7 @@ public sealed partial class StudioViewModel : ObservableObject
         SourceKinds = new ObservableCollection<SourceKindOption>
         {
             new(CaptureSourceKind.CaptureCard, "HDMI capture card"),
+            new(CaptureSourceKind.ConsoleStream, "Console Remote Play stream"),
             new(CaptureSourceKind.Display, "Desktop display"),
             new(CaptureSourceKind.Window, "Game window"),
             new(CaptureSourceKind.TestPattern, "Test pattern")
@@ -505,6 +506,7 @@ public sealed partial class StudioViewModel : ObservableObject
     public string SourceKindHint => Config.Capture.SourceKind switch
     {
         CaptureSourceKind.CaptureCard => "HDMI capture card via DirectShow. The card's own driver reports which modes are available.",
+        CaptureSourceKind.ConsoleStream => "PlayStation Remote Play through the Remote Play engine: compressed console video is decoded by the same FFmpeg pipeline used everywhere else.",
         CaptureSourceKind.Display => "Captures a Windows display with GDI desktop capture. Useful for PC gameplay in windowed or borderless mode.",
         CaptureSourceKind.Window => "Captures a single game window. PC games in fullscreen exclusive mode may need borderless instead.",
         _ => "Generated test pattern — a real source used to verify preview and recording without hardware."
@@ -1894,6 +1896,7 @@ public sealed partial class StudioViewModel : ObservableObject
         Trim(_latencyHistory);
         Trim(_ramHistory);
 
+        RaiseConsoleState();
         Raise(nameof(FpsText));
         Raise(nameof(FpsChipLive));
         Raise(nameof(OutputFpsLabel));

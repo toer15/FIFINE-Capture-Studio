@@ -52,6 +52,9 @@ jobs:
       - name: Build (Release)
         run: dotnet build FIFINE.CaptureStudio.sln -c Release --no-restore -p:Version=${{ env.VERSION }}
 
+      - name: Install FFmpeg (console stream decode test)
+        run: choco install ffmpeg -y --no-progress
+
       - name: Run automated tests
         run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release -p:Version=${{ env.VERSION }} --logger "console;verbosity=normal"
 

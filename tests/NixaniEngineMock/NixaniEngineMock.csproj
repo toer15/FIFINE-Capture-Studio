@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NixaniEngineMock</AssemblyName>
+    <RootNamespace>NixaniEngineMock</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The wire format is shared with the application so both sides cannot drift apart. -->
+    <Compile Include="..\..\src\FifineCaptureStudio\Core\Streaming\Nixani\NixaniFrames.cs" Link="NixaniFrames.cs" />
+  </ItemGroup>
+
+</Project>

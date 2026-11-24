@@ -7,6 +7,12 @@ namespace FifineCaptureStudio.Capture;
 public sealed class PipelineOptions
 {
     public required SourceSpec Source { get; init; }
+
+    /// <summary>Named pipe carrying compressed console video (ConsoleStream sources only).</summary>
+    public string ConsoleVideoPipe { get; init; } = string.Empty;
+
+    /// <summary>"h264" or "hevc" — the codec the console backend negotiated.</summary>
+    public string ConsoleCodec { get; init; } = "h264";
     public int PreviewWidth { get; init; } = 1600;
     public bool PreviewEnabled { get; init; } = true;
     public bool MeasureLatency { get; init; } = true;
@@ -47,7 +53,7 @@ public static class PipelineArgs
         };
 
         ApplyLatency(args, options);
-        AppendVideoInput(args, options.Source);
+        AppendVideoInput(args, options);
         AppendAudioInputs(args, options);
 
         if (options.PreviewEnabled)
@@ -129,10 +135,20 @@ public static class PipelineArgs
         }
     }
 
-    private static void AppendVideoInput(List<string> args, SourceSpec source)
+    private static void AppendVideoInput(List<string> args, PipelineOptions options)
     {
+        var source = options.Source;
         switch (source.Kind)
         {
+            case CaptureSourceKind.ConsoleStream:
+                // The console backend delivers complete Annex B access units through a named pipe.
+                args.AddRange(new[]
+                {
+                    "-f", string.Equals(options.ConsoleCodec, "hevc", StringComparison.OrdinalIgnoreCase) ? "hevc" : "h264",
+                    "-framerate", Math.Clamp(source.Fps, 1, 120).ToString(CultureInfo.InvariantCulture),
+                    "-i", string.IsNullOrEmpty(options.ConsoleVideoPipe) ? "pipe:0" : options.ConsoleVideoPipe
+                });
+                break;
             case CaptureSourceKind.TestPattern:
                 args.AddRange(new[]
                 {

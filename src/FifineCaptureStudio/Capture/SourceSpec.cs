@@ -62,6 +62,23 @@ public static class SourceResolver
             case CaptureSourceKind.TestPattern:
                 return SourceSpec.TestPattern(width, height, fps);
 
+            case CaptureSourceKind.ConsoleStream:
+            {
+                var ps = settings.PlayStation;
+                return new SourceSpec(
+                    CaptureSourceKind.ConsoleStream,
+                    (ps.IsPs5 ? "PlayStation 5" : "PlayStation 4") +
+                    (string.IsNullOrWhiteSpace(ps.ConsoleName) ? " · Remote Play" : " · " + ps.ConsoleName),
+                    string.Empty,
+                    string.Empty,
+                    0,
+                    0,
+                    Math.Max(640, ps.Width),
+                    Math.Max(360, ps.Height),
+                    Math.Clamp(ps.Fps, 30, 60),
+                    ps.PreferHevc && ps.IsPs5 ? "HEVC" : "H.264");
+            }
+
             default:
                 return new SourceSpec(
                     CaptureSourceKind.CaptureCard,
@@ -80,6 +97,7 @@ public static class SourceResolver
     public static string Describe(CaptureSourceKind kind) => kind switch
     {
         CaptureSourceKind.CaptureCard => "HDMI capture card (DirectShow)",
+        CaptureSourceKind.ConsoleStream => "Console Remote Play stream",
         CaptureSourceKind.Display => "Desktop display (Windows GDI capture)",
         CaptureSourceKind.Window => "Game window (Windows GDI capture)",
         _ => "Generated test pattern"

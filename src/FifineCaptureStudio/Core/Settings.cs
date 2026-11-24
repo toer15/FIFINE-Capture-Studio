@@ -9,7 +9,10 @@ public enum CaptureSourceKind
     CaptureCard,
     Display,
     Window,
-    TestPattern
+    TestPattern,
+
+    /// <summary>Video arrives from a console streaming backend instead of a capture device.</summary>
+    ConsoleStream
 }
 
 public enum PlatformKind
@@ -93,6 +96,53 @@ public sealed class CaptureSettings
     public int Fps { get; set; } = 60;
     public bool HdrEnabled { get; set; }
     public PlatformKind Platform { get; set; } = PlatformKind.PS5;
+}
+
+/// <summary>
+/// PlayStation Remote Play settings. The registration keys are console credentials and are stored
+/// DPAPI-protected (per Windows user), never in plain text and never in the repository.
+/// </summary>
+public sealed class PlayStationSettings
+{
+    public string EnginePath { get; set; } = string.Empty;
+    public string HostId { get; set; } = string.Empty;
+    public string ConsoleName { get; set; } = string.Empty;
+    public string ConsoleAddress { get; set; } = string.Empty;
+    public bool IsPs5 { get; set; } = true;
+    public int Resolution { get; set; } = 1080;
+    public int Fps { get; set; } = 60;
+    public int BitrateKbps { get; set; }
+    public bool PreferHevc { get; set; }
+    public bool DualSenseHaptics { get; set; } = true;
+    public bool ForwardController { get; set; } = true;
+    public uint ConsolePin { get; set; }
+    public string AccountId { get; set; } = string.Empty;
+    public string RegistKey { get; set; } = string.Empty;
+    public string RpKey { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    public bool HasRegistration => !string.IsNullOrEmpty(RegistKey) && !string.IsNullOrEmpty(RpKey);
+
+    [JsonIgnore]
+    public int Width => Resolution >= 1080 ? 1920 : Resolution >= 720 ? 1280 : 960;
+
+    [JsonIgnore]
+    public int Height => Resolution >= 1080 ? 1080 : Resolution >= 720 ? 720 : Resolution >= 540 ? 540 : 360;
+}
+
+/// <summary>Xbox account and console selection. The token is DPAPI-protected.</summary>
+public sealed class XboxSettings
+{
+    public string Gamertag { get; set; } = string.Empty;
+    public string Xuid { get; set; } = string.Empty;
+    public string ConsoleId { get; set; } = string.Empty;
+    public string ConsoleName { get; set; } = string.Empty;
+    public string Region { get; set; } = "en-US";
+    public string Token { get; set; } = string.Empty;
+    public bool ForwardController { get; set; } = true;
+
+    [JsonIgnore]
+    public bool HasToken => !string.IsNullOrEmpty(Token);
 }
 
 public sealed class LowLatencySettings
@@ -202,7 +252,7 @@ public sealed class UpdateSettings
 
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GeneralSettings General { get; set; } = new();
@@ -214,6 +264,8 @@ public sealed class AppSettings
     public ReplaySettings Replay { get; set; } = new();
     public HotkeySettings Hotkeys { get; set; } = new();
     public UpdateSettings Updates { get; set; } = new();
+    public PlayStationSettings PlayStation { get; set; } = new();
+    public XboxSettings Xbox { get; set; } = new();
     public bool WizardCompleted { get; set; }
 
     public static void Normalize(AppSettings s)
@@ -228,6 +280,19 @@ public sealed class AppSettings
             s.Updates.Channel = UpdateChannel.Stable;
             s.SchemaVersion = CurrentSchemaVersion;
         }
+
+        // Schema 2 added the console streaming settings; defaults above are the migration.
+        s.PlayStation ??= new PlayStationSettings();
+        s.Xbox ??= new XboxSettings();
+        if (s.SchemaVersion < CurrentSchemaVersion)
+        {
+            s.SchemaVersion = CurrentSchemaVersion;
+        }
+
+        s.PlayStation.Resolution = s.PlayStation.Resolution is 360 or 540 or 720 or 1080 ? s.PlayStation.Resolution : 1080;
+        s.PlayStation.Fps = s.PlayStation.Fps >= 60 ? 60 : 30;
+        s.PlayStation.BitrateKbps = Math.Clamp(s.PlayStation.BitrateKbps, 0, 100000);
+        s.PlayStation.EnginePath = (s.PlayStation.EnginePath ?? string.Empty).Trim();
 
         s.Updates.CheckIntervalMinutes = Math.Clamp(s.Updates.CheckIntervalMinutes, 30, 10080);
         s.Updates.Repository = (s.Updates.Repository ?? string.Empty).Trim();

@@ -73,11 +73,13 @@ public sealed class PairingViewModel : INotifyPropertyChanged
     public string Instructions => Platform switch
     {
         PairingPlatform.PlayStation =>
-            "Open Settings → System → Remote Play → Pair Device on your PS5 (PS4: Settings → Remote Play Connection Settings → Add Device). " +
-            "A pairing number appears on your television. Enter that number below.",
+            "Open Settings → System → Remote Play → Link Device on your PS5 (PS4: Settings → Remote Play → Add Device). " +
+            "The console shows an 8-digit code. Enter it below and FIFINE registers with the console through the Remote Play engine, " +
+            "then starts the real stream.",
         PairingPlatform.Xbox =>
-            "Xbox does not expose a third-party pairing or video API. FIFINE cannot inject a pairing prompt into the Xbox OS. " +
-            "Use the console's HDMI output with a capture card, which the wizard can start for you.",
+            "Xbox home streaming is delivered over WebRTC by Microsoft's xHome service; the open clients for it (Greenlight, " +
+            "xbox-xcloud-player) are Node/Electron applications, not a library this build can host. FIFINE therefore does not " +
+            "offer Xbox network video yet. HDMI capture is the supported path, and the button below starts it.",
         _ =>
             "FIFINE Link Agent is the companion app for another gaming PC. If it is installed and running on the same network, it answers " +
             "the FIFINE discovery broadcast below. You can also capture this PC's display directly."
@@ -236,8 +238,16 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         Stage = PairingStage.Searching;
         Status = Platform == PairingPlatform.Pc
             ? "Broadcasting FIFINE discovery on the local network…"
-            : "Scanning the local network for console streaming ports…";
+            : Platform == PairingPlatform.PlayStation
+                ? "Asking the Remote Play engine to find consoles on this network…"
+                : "Scanning the local network for console streaming ports…";
         Devices.Clear();
+
+        if (Platform == PairingPlatform.PlayStation)
+        {
+            await SearchPlayStationAsync().ConfigureAwait(true);
+            return;
+        }
 
         try
         {
@@ -274,6 +284,52 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         Raise(nameof(CanConnect));
     }
 
+    private async Task SearchPlayStationAsync()
+    {
+        if (!_studio.PlayStation.IsEngineAvailable)
+        {
+            Stage = PairingStage.Unsupported;
+            Status = "The PlayStation streaming engine (nixani-engine.exe) is not installed, so console discovery and Remote Play " +
+                     "are unavailable. Build it from github.com/Nixani/nixani-engine and set its path in Settings → PlayStation, " +
+                     "or use HDMI capture below.";
+            return;
+        }
+
+        try
+        {
+            var hosts = await _studio.PlayStation.DiscoverAsync(TimeSpan.FromSeconds(6), _searchCts!.Token)
+                .ConfigureAwait(true);
+            foreach (var host in hosts)
+            {
+                Devices.Add(new PairingDevice(
+                    host.Name,
+                    host.Address,
+                    LanDiscovery.PlayStationPort,
+                    PairingPlatform.PlayStation,
+                    "Remote Play engine",
+                    $"{host.StateLabel} · {(host.IsPs5 ? "PS5" : "PS4")} · {host.SystemVersion}"));
+            }
+
+            if (hosts.Count == 0)
+            {
+                Stage = PairingStage.NoDevices;
+                Status = "No console answered the Remote Play engine's discovery. Check that the console is on, Remote Play is enabled, " +
+                         "and it is on the same network — or type its IP address.";
+            }
+            else
+            {
+                Stage = PairingStage.DevicesFound;
+                SelectedDevice = Devices[0];
+                Status = $"{hosts.Count} PlayStation console(s) found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Stage = PairingStage.Failed;
+            Status = "Console discovery failed: " + ex.Message;
+        }
+    }
+
     private async Task ConnectAsync()
     {
         var address = ManualAddress.Length > 0 ? ManualAddress : SelectedDevice?.Address ?? string.Empty;
@@ -281,6 +337,12 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         if (Platform == PairingPlatform.Pc)
         {
             await PairAgentAsync(address).ConfigureAwait(true);
+            return;
+        }
+
+        if (Platform == PairingPlatform.PlayStation)
+        {
+            await ConnectPlayStationAsync(address).ConfigureAwait(true);
             return;
         }
 
@@ -313,12 +375,72 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         }
 
         Stage = PairingStage.Unsupported;
-        Status = Platform == PairingPlatform.PlayStation
-            ? $"Console reached at {address}. Sony's Remote Play registration handshake — the step that turns that pairing number into an " +
-              "authorised session — is proprietary and not implemented in this build. FIFINE will not fake a connection, so pairing stops here. " +
-              "The console's HDMI output through a capture card is the supported path, and the button below starts it."
-            : $"Console reached at {address}. Xbox exposes no third-party API that delivers its video or accepts an app pairing code. " +
-              "HDMI capture is the supported path, and the button below starts it.";
+        Status = $"Console reached at {address}. Xbox home streaming runs over Microsoft's xHome WebRTC service; the open clients " +
+                 "for it (Greenlight, xbox-xcloud-player) are Node/Electron applications, so this build has no Xbox network video " +
+                 "transport and will not claim a connection. HDMI capture is the supported path, and the button below starts it.";
+    }
+
+    /// <summary>The real PS5/PS4 flow: link with the displayed code, then start Remote Play.</summary>
+    private async Task ConnectPlayStationAsync(string address)
+    {
+        if (Code.Length == 0)
+        {
+            Status = "Enter the 8-digit code shown on the console first.";
+            return;
+        }
+
+        if (address.Length == 0)
+        {
+            Status = "Select the console or type its IP address.";
+            return;
+        }
+
+        if (_studio.PlayStation.HasRegistration && Code.Length == 0)
+        {
+            // already linked: straight to a session
+        }
+
+        Stage = PairingStage.Authenticating;
+        Status = $"Registering with the console at {address}…";
+
+        var code = Code;
+        Code = string.Empty;
+        var registration = await _studio.PlayStation
+            .RegisterAsync(address, code, 0, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        if (!registration.Ok)
+        {
+            Stage = PairingStage.Failed;
+            Status = "Registration failed: " + registration.Error;
+            return;
+        }
+
+        Stage = PairingStage.VerifyingVideo;
+        Status = "Registered. Starting Remote Play and waiting for console video…";
+
+        var verified = await _studio.StartConsoleCaptureAndVerifyAsync(TimeSpan.FromSeconds(45))
+            .ConfigureAwait(true);
+
+        if (verified)
+        {
+            Stage = PairingStage.Connected;
+            Status = $"Connected · receiving live video from {registration.Nickname}.";
+            _store.Remember(Platform, registration.Nickname, address, "PlayStation Remote Play");
+            TrustedDevices.Clear();
+            foreach (var device in _store.For(Platform))
+            {
+                TrustedDevices.Add(device);
+            }
+
+            _studio.OpenLiveCapturePage();
+            return;
+        }
+
+        Stage = PairingStage.Failed;
+        Status = _studio.PlayStation.LastError is { Length: > 0 } error
+            ? "The console did not deliver video: " + error
+            : _studio.PlayStation.StatusText;
     }
 
     private async Task PairAgentAsync(string address)

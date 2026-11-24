@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using FifineCaptureStudio.Audio;
 using FifineCaptureStudio.Core;
+using FifineCaptureStudio.Core.Streaming;
 
 namespace FifineCaptureStudio.Capture;
 
@@ -55,6 +56,7 @@ public sealed class CaptureSession : IAsyncDisposable
     private readonly SettingsService _settings;
     private readonly EncoderCatalog _encoders;
     private readonly AudioEngine _audio;
+    private readonly PlayStationStreamService _console;
     private readonly Func<IReadOnlyList<DisplayInfo>> _displays;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -90,12 +92,14 @@ public sealed class CaptureSession : IAsyncDisposable
         SettingsService settings,
         EncoderCatalog encoders,
         AudioEngine audio,
+        PlayStationStreamService console,
         Func<IReadOnlyList<DisplayInfo>> displays)
     {
         _ffmpeg = ffmpeg;
         _settings = settings;
         _encoders = encoders;
         _audio = audio;
+        _console = console;
         _displays = displays;
     }
 
@@ -186,6 +190,22 @@ public sealed class CaptureSession : IAsyncDisposable
             }
 
             var options = BuildOptions(recordPath: null);
+
+            if (options.Source.Kind == CaptureSourceKind.ConsoleStream)
+            {
+                // The console backend must be streaming before FFmpeg opens the video pipe.
+                if (!await _console.ConnectAsync(CancellationToken.None).ConfigureAwait(false))
+                {
+                    LastError = _console.LastError ?? _console.StatusText;
+                    StatusLine = "Console not ready";
+                    Notice?.Invoke(LastError, true);
+                    RaiseState();
+                    return false;
+                }
+
+                options = BuildOptions(recordPath: null);
+            }
+
             if (options.Source.Kind == CaptureSourceKind.CaptureCard && string.IsNullOrWhiteSpace(options.Source.DeviceName))
             {
                 LastError = "No capture device selected.";
@@ -232,6 +252,11 @@ public sealed class CaptureSession : IAsyncDisposable
             }
 
             await StopProcessAsync(intentional: true).ConfigureAwait(false);
+            if (_console.IsStreaming || _console.State != ConsoleStreamState.Idle)
+            {
+                await _console.StopAsync().ConfigureAwait(false);
+            }
+
             IsPreviewing = false;
             PipelineMode = "Stopped";
             StatusLine = "Idle";
@@ -851,7 +876,9 @@ public sealed class CaptureSession : IAsyncDisposable
             SeparateAudioTracks = s.Recording.SeparateAudioTracks,
             AudioSampleRate = s.Audio.SampleRate,
             Latency = s.LowLatency.Mode,
-            VideoBufferMs = s.LowLatency.VideoBufferMs
+            VideoBufferMs = s.LowLatency.VideoBufferMs,
+            ConsoleVideoPipe = source.Kind == CaptureSourceKind.ConsoleStream ? _console.VideoPipePath ?? string.Empty : string.Empty,
+            ConsoleCodec = s.PlayStation.PreferHevc && s.PlayStation.IsPs5 ? "hevc" : "h264"
         };
     }
 

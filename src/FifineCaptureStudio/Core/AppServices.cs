@@ -1,6 +1,7 @@
 using System.IO;
 using FifineCaptureStudio.Audio;
 using FifineCaptureStudio.Capture;
+using FifineCaptureStudio.Core.Streaming;
 using FifineCaptureStudio.Library;
 
 namespace FifineCaptureStudio.Core;
@@ -22,7 +23,8 @@ public sealed class AppServices : IAsyncDisposable
         Library = new RecordingsLibrary(Ffmpeg);
         Hotkeys = new HotkeyManager();
         Updates = new Updates.UpdateService(Settings);
-        Session = new CaptureSession(Ffmpeg, Settings, Encoders, Audio, () => Displays);
+        PlayStation = new PlayStationStreamService(Settings, Audio);
+        Session = new CaptureSession(Ffmpeg, Settings, Encoders, Audio, PlayStation, () => Displays);
     }
 
     public SettingsService Settings { get; }
@@ -34,6 +36,7 @@ public sealed class AppServices : IAsyncDisposable
     public RecordingsLibrary Library { get; }
     public HotkeyManager Hotkeys { get; }
     public Updates.UpdateService Updates { get; }
+    public PlayStationStreamService PlayStation { get; }
     public CaptureSession Session { get; }
 
     public IReadOnlyList<DShowDevice> VideoDevices { get; private set; } = Array.Empty<DShowDevice>();
@@ -115,6 +118,7 @@ public sealed class AppServices : IAsyncDisposable
         Performance.Dispose();
 
         try { await Session.DisposeAsync().ConfigureAwait(false); } catch { }
+        try { await PlayStation.DisposeAsync().ConfigureAwait(false); } catch { }
         try { await Audio.StopAsync().ConfigureAwait(false); } catch { }
         Audio.Dispose();
 
