@@ -338,6 +338,7 @@ public sealed partial class StudioViewModel
         }
 
         _nativePresenter = presenter;
+        presenter.UpdateOverlay(BuildFpsOverlaySnapshot());
         _fgSessionGeneratedStart = service.GeneratedFrames;
         _fgSessionSourceStart = service.SourceFrames;
         _fgSessionSkippedStart = service.SkippedInterpolations;

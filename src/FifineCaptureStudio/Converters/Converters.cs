@@ -89,6 +89,28 @@ public sealed class BooleanToStretchConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+public sealed class OverlayHorizontalConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is Core.Monitoring.OverlayCorner.TopRight or Core.Monitoring.OverlayCorner.BottomRight
+            ? HorizontalAlignment.Right
+            : HorizontalAlignment.Left;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+public sealed class OverlayVerticalConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is Core.Monitoring.OverlayCorner.BottomLeft or Core.Monitoring.OverlayCorner.BottomRight
+            ? VerticalAlignment.Bottom
+            : VerticalAlignment.Top;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Returns half of a width/height, used to clip the split comparison overlay.</summary>
 public sealed class HalfValueConverter : System.Windows.Data.IValueConverter
 {

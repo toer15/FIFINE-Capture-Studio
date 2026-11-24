@@ -23,6 +23,8 @@
             <conv:StepFillConverter x:Key="StepFill" />
             <conv:RoleToVisibilityConverter x:Key="RoleToVis" />
             <conv:ProgressWidthConverter x:Key="ProgressWidth" />
+            <conv:OverlayHorizontalConverter x:Key="OverlayHorizontal" />
+            <conv:OverlayVerticalConverter x:Key="OverlayVertical" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

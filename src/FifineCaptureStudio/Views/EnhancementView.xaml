@@ -1,6 +1,7 @@
 <UserControl x:Class="FifineCaptureStudio.Views.EnhancementView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:FifineCaptureStudio.Controls">
 
     <UserControl.Resources>
         <Style x:Key="SectionTitle" TargetType="TextBlock">
@@ -104,6 +105,8 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="12" />
                     <RowDefinition Height="Auto" />
@@ -407,8 +410,166 @@
                     </StackPanel>
                 </Border>
 
+                <!-- fps monitoring -->
+                <Border Grid.Row="6" Grid.ColumnSpan="3" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF2B3A55" BorderThickness="1" CornerRadius="12" Padding="16,14">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="FPS MONITORING" Style="{StaticResource SectionTitle}" />
+                                <TextBlock Text="The game's own frame rate and FIFINE's interpolated output are measured separately. Capture-stream FPS is never substituted for game FPS."
+                                           Style="{StaticResource SectionHint}" MaxWidth="820" HorizontalAlignment="Left" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                <TextBlock Text="Overlay" Style="{StaticResource SliderLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding FpsOverlayVisible, Mode=TwoWay}"
+                                              VerticalAlignment="Center" />
+                                <ComboBox Style="{StaticResource DarkCombo}" Width="116" Height="28" Margin="12,0,0,0"
+                                          ItemsSource="{Binding OverlayCornerOptions}"
+                                          SelectedItem="{Binding FpsOverlayCorner, Mode=TwoWay}" />
+                                <TextBlock Text="Scale" Style="{StaticResource SliderLabel}" VerticalAlignment="Center" Margin="12,0,6,0" />
+                                <Slider Style="{StaticResource MixSlider}" Width="90" Minimum="0.75" Maximum="1.5"
+                                        Value="{Binding FpsOverlayScale, Mode=TwoWay}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="1.35*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Background="#FF0E1624" CornerRadius="10" Padding="14,10">
+                                <StackPanel>
+                                    <TextBlock Text="GAME FPS" Style="{StaticResource MetricLabel}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding GameFpsDisplay}" FontSize="34" FontWeight="Bold"
+                                                   Foreground="{StaticResource Green}" />
+                                        <TextBlock Text="{Binding GameFpsQualifier}" FontSize="10" Foreground="{StaticResource TextDim}"
+                                                   VerticalAlignment="Bottom" Margin="8,0,0,6" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding GameFpsDetailText}" Style="{StaticResource SectionHint}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="2" Background="#FF0E1624" CornerRadius="10" Padding="14,10">
+                                <StackPanel>
+                                    <TextBlock Text="FRAME GEN OUTPUT" Style="{StaticResource MetricLabel}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding FrameGenOutputDisplay}" FontSize="34" FontWeight="Bold"
+                                                   Foreground="{StaticResource Cyan}" />
+                                        <TextBlock Text="fps" FontSize="11" Foreground="{StaticResource TextDim}"
+                                                   VerticalAlignment="Bottom" Margin="6,0,0,6" />
+                                    </StackPanel>
+                                    <TextBlock Text="Generated + original frames scheduled by the interpolator; not a target value."
+                                               Style="{StaticResource SectionHint}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Grid Grid.Column="4">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="6" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="6" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="6" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="MEASUREMENT SOURCE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorSourceText}" Style="{StaticResource MetricValue}" FontSize="11.5" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="CONFIDENCE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorConfidenceText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2">
+                                    <TextBlock Text="INPUT STREAM" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorInputText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="1">
+                                    <TextBlock Text="PRESENTED (FIFINE)" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorPresentedText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="4">
+                                    <TextBlock Text="GENERATED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorGeneratedText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="4" Grid.Column="1">
+                                    <TextBlock Text="FRAME TIME" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorFrameTimeText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="6">
+                                    <TextBlock Text="GAME DISPLAYED (PRESENTMON)" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorDisplayedText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="6" Grid.Column="1">
+                                    <TextBlock Text="QUEUE AGE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorQueueAgeText}" Style="{StaticResource MetricValue}" FontSize="11.5" />
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="PC GAME PROCESS (PRESENTMON / ETW)" Style="{StaticResource MetricLabel}" />
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox Style="{StaticResource DarkCombo}" Height="30" ItemsSource="{Binding PcGameProcesses}"
+                                              SelectedItem="{Binding SelectedPcGameProcess, Mode=TwoWay}"
+                                              DisplayMemberPath="Display" />
+                                    <Button Grid.Column="1" Content="Refresh" Style="{StaticResource GhostButton}" Height="28"
+                                            Margin="8,0,0,0" Command="{Binding RefreshPcProcessesCommand}" />
+                                    <Button Grid.Column="2" Content="Clear" Style="{StaticResource GhostButton}" Height="28"
+                                            Margin="6,0,0,0" Command="{Binding ClearPcGameProcessCommand}" />
+                                </Grid>
+                                <TextBlock Text="{Binding PcMonitorStatusText}" Style="{StaticResource SectionHint}" />
+                                <TextBlock Text="PresentMon reads present events through ETW without injecting into the game. It may require the Performance Log Users group or elevation for processes owned by another account; FIFINE never requests that silently."
+                                           Style="{StaticResource SectionHint}" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+                                <Grid>
+                                    <TextBlock Text="DETAILED MEASUREMENT" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding FpsMonitorRefreshText}" Style="{StaticResource SectionHint}" HorizontalAlignment="Right" Margin="0" />
+                                </Grid>
+                                <TextBlock Text="{Binding FpsMonitorLimitText}" Style="{StaticResource SectionHint}" />
+                                <TextBlock Text="{Binding FpsMonitorDroppedText, StringFormat=Dropped: {0}}" Style="{StaticResource SectionHint}" />
+                                <TextBlock Text="{Binding FpsMonitorProcessingText, StringFormat=Interpolation: {0}}" Style="{StaticResource SectionHint}" />
+                                <TextBlock Text="{Binding FpsMonitorPresentationBoundaryText}" Style="{StaticResource SectionHint}"
+                                           TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Content="{Binding PresentMonActionText}" Command="{Binding InstallPresentMonCommand}"
+                                            Style="{StaticResource GhostButton}" Height="30" />
+                                    <TextBlock Text="{Binding PresentMonProgress}" Foreground="{StaticResource Amber}"
+                                               VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" />
+                                    <TextBlock Text="{Binding PresentMonStatusText}" Style="{StaticResource SectionHint}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- colour -->
-                <Border Grid.Row="6" Grid.Column="0" Background="{StaticResource CardGradient}"
+                <Border Grid.Row="8" Grid.Column="0" Background="{StaticResource CardGradient}"
                         BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
                     <StackPanel>
                         <TextBlock Text="COLOUR &amp; HDR" Style="{StaticResource SectionTitle}" />
@@ -531,7 +692,7 @@
                 </Border>
 
                 <!-- performance -->
-                <Border Grid.Row="6" Grid.Column="2" Background="{StaticResource CardGradient}"
+                <Border Grid.Row="8" Grid.Column="2" Background="{StaticResource CardGradient}"
                         BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
                     <StackPanel>
                         <TextBlock Text="PERFORMANCE" Style="{StaticResource SectionTitle}" />

@@ -31,6 +31,12 @@ public static class Program
             return;
         }
 
+        if (args.Contains("--fps-probe"))
+        {
+            Core.Monitoring.FpsProbe.Run(args);
+            return;
+        }
+
         if (args.Contains("--fg-present-test"))
         {
             Rendering.PresenterSelfTest.Run(args);

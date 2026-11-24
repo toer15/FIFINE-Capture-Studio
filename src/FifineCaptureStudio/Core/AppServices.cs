@@ -26,6 +26,7 @@ public sealed class AppServices : IAsyncDisposable
         PlayStation = new PlayStationStreamService(Settings, Audio);
         Enhancement = new Enhancement.EnhancementService(Settings);
         FrameGeneration = new FrameGeneration.FrameGenerationService(Settings);
+        FpsMonitor = new Monitoring.FpsMonitorService(Settings);
         Session = new CaptureSession(Ffmpeg, Settings, Encoders, Audio, PlayStation, () => Displays);
     }
 
@@ -41,6 +42,7 @@ public sealed class AppServices : IAsyncDisposable
     public PlayStationStreamService PlayStation { get; }
     public Enhancement.EnhancementService Enhancement { get; }
     public FrameGeneration.FrameGenerationService FrameGeneration { get; }
+    public Monitoring.FpsMonitorService FpsMonitor { get; }
     public CaptureSession Session { get; }
 
     public IReadOnlyList<DShowDevice> VideoDevices { get; private set; } = Array.Empty<DShowDevice>();
@@ -126,6 +128,7 @@ public sealed class AppServices : IAsyncDisposable
         try { await PlayStation.DisposeAsync().ConfigureAwait(false); } catch { }
         try { Enhancement.Dispose(); } catch { }
         try { FrameGeneration.Dispose(); } catch { }
+        try { FpsMonitor.Dispose(); } catch { }
         try { await Audio.StopAsync().ConfigureAwait(false); } catch { }
         Audio.Dispose();
 

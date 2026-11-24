@@ -1,5 +1,6 @@
 using FifineCaptureStudio.Core.Enhancement;
 using FifineCaptureStudio.Core.FrameGeneration;
+using FifineCaptureStudio.Core.Monitoring;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -296,6 +297,7 @@ public sealed class AppSettings
     public XboxSettings Xbox { get; set; } = new();
     public EnhancementSettings Enhancement { get; set; } = new();
     public FrameGenerationSettings FrameGeneration { get; set; } = new();
+    public FpsMonitorSettings FpsMonitor { get; set; } = new();
     public UiSettings Ui { get; set; } = new();
     public bool WizardCompleted { get; set; }
 
@@ -340,6 +342,8 @@ public sealed class AppSettings
         s.Enhancement.Normalize();
         s.FrameGeneration ??= new FrameGenerationSettings();
         s.FrameGeneration.Normalize();
+        s.FpsMonitor ??= new FpsMonitorSettings();
+        s.FpsMonitor.Normalize();
 
         // Schema 4: onboarding completion is tracked explicitly. Builds before it only cleared the
         // "show wizard on startup" flag when the wizard was dismissed, so honour that as completion

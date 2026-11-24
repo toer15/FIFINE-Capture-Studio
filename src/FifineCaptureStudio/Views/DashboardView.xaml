@@ -170,6 +170,8 @@
                             </Button>
                         </StackPanel>
                     </Border>
+                    <controls:FpsOverlayView Panel.ZIndex="20" />
+
                     <Border Background="#FF04060A" CornerRadius="14">
                         <Image x:Name="PreviewImageElement" Source="{Binding PreviewImage}"
                                Stretch="{Binding KeepAspect, Converter={StaticResource BoolToStretch}}"

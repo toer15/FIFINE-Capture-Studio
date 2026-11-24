@@ -270,6 +270,85 @@ with zero missed deadlines, which verifies cadence independently of capture.
 * HDMI passthrough to a television remains the console's original signal. Generated frames appear
   only on the display driven by FIFINE's native presenter (or mirrored from it).
 
+## FPS monitoring
+
+FPS is reported with four separate values, never one shared counter:
+
+* **Game FPS** — the game's own presentation rate. On PC this is a direct PresentMon measurement for
+  the selected process; on PS5/Xbox/capture video it is a confidence-rated visual estimate.
+* **Frame-gen output** — original source frames plus generated intermediate frames scheduled by the
+  interpolator. The configured 120 FPS target is never displayed as a measurement.
+* **Generated** — new intermediate frames actually produced per second.
+* **Presented** — successful `Present` calls on FIFINE's native flip swapchain, sampled over 0.5 s.
+
+### PC games: PresentMon
+
+The app bundles no service and requires no injection. It downloads the pinned, MIT-licensed Intel
+PresentMon **2.6.0** portable executable only when the user chooses **Download PresentMon**, verifies
+its SHA-256 (`b2a706bc…188f1af`, 980,320 bytes), writes the licence next to it, and runs one persistent
+console capture per selected process:
+
+```
+PresentMon.exe --process_id <pid> --output_stdout --no_console_stats --v1_metrics
+              --stop_existing_session --terminate_on_proc_exit --session_name FIFINE_FPS_<pid>_<id>
+```
+
+Rows are parsed incrementally as UTF-16 CSV. Presents are grouped by `SwapChainAddress`; the primary
+chain is the one with the most presents in its last two seconds, not merely the last chain touched,
+so a launcher or overlay chain cannot replace the game. Game FPS is `(presents-1)/span` over a 2 s
+window; frame time is the median `msBetweenPresents`; displayed FPS, when PresentMon supplies
+`msBetweenDisplayChange`, is derived from its median interval. Dropped presents are counted from the
+`Dropped` field. A stale or exited capture reports unavailable rather than a last-known value.
+
+PresentMon needs ETW access. The UI explains that Windows' **Performance Log Users** group or an
+elevated run may be required for another account's process, and never requests elevation silently.
+If present events cannot be read, the cell stays **UNAVAILABLE**. The named ETW session is stopped
+with `logman` when monitoring stops, because killing PresentMon alone leaves sessions that starve
+later captures.
+
+### Console and capture video: cadence estimate
+
+Every decoded frame is reduced to a 64×36 BGRA sample and then to 16×9 tile luminance. Mean tile
+deltas, rather than a whole-frame hash, decide whether a visual frame is new: this tolerates codec
+noise and small per-pixel variation while still recognising a duplicated frame. A 240-sample rolling
+window (about 4 s at 60 FPS) gives a new-frame rate, snapped only when it is within 0.65 FPS of a whole
+number. Confidence combines window coverage and first-half/second-half regularity (42% base, up to
+36% coverage and 17% regularity, capped at 95%).
+
+* Repeated frames are not new game frames, so 30 FPS inside a 60 FPS stream reports ≈30.
+* 40 FPS inside a 60 FPS stream reports ≈40 from its two-new/one-repeat cadence.
+* A full-rate 60 FPS stream is labelled **stream-limited**: the input cannot prove a faster game.
+* A static scene returns the last stable estimate at reduced confidence for up to 10 s, then becomes
+  temporarily unavailable.
+* A hard scene cut discards the temporal window and shows **re-measuring** instead of a fake rate.
+
+This is an estimate. It never claims to read the console's internal render counter, and HDMI/Remote
+Play cannot reveal a game faster than the incoming stream.
+
+### UI and measurement boundary
+
+The compact overlay shows GAME FPS, FRAME GEN, GENERATED, PRESENTED and INPUT STREAM. It has four
+corners, a 0.75–1.5 scale, and its visibility/position/scale persist in `FpsMonitorSettings`. It is a
+WPF control on Dashboard, Live Capture and fullscreen preview, and a cached 3×5 block-text layer
+composited directly into the native presenter's BGRA frames (a separate WPF window would add another
+presentation path and cannot reliably sit above a flip-model swapchain). The Gaming Enhancement card
+adds source, selected process, confidence, frame time, dropped/late counts, interpolation time, queue
+state and display refresh.
+
+### Tests and measured results
+
+`FpsMonitorTests` covers 30/40/60-in-60 cadences, repeated frames, codec-sized noise, static scenes,
+scene cuts, PresentMon CSV quoting/BOM, multi-chain primary selection and settings normalisation.
+The full suite is **76 passing**.
+
+A live 15 s Performance run with enhancement and the overlay enabled presented **1691 frames at
+119.0 FPS** on the 280 Hz display, with 849 generated frames, 13.87 ms average inference (15.60 ms
+p95), 11 missed deadlines and about 407 MB VRAM. The current machine's PresentMon session reported
+all ETW present events lost (even elevated), so the PC-game path is validated by parser/chain unit
+tests and a live source start, not by a real game's rows here; that limitation is shown as
+**UNAVAILABLE** in the UI instead of a fabricated number. A real game on a machine with working
+PresentMon ETW capture is still required to confirm DirectX 11/12/Vulkan rows end to end.
+
 ### Recording and passthrough
 
 Live frame generation is presentation-only. Normal recordings stay at the configured recording FPS and

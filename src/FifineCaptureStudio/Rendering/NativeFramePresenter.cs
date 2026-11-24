@@ -6,6 +6,7 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.FrameGeneration;
+using FifineCaptureStudio.Core.Monitoring;
 using Device = SharpDX.Direct3D11.Device;
 using Resource = SharpDX.Direct3D11.Resource;
 
@@ -44,6 +45,7 @@ public sealed class NativeFramePresenter : IDisposable
     private string _displayName = "Display";
     private readonly int _bufferWidth;
     private readonly int _bufferHeight;
+    private volatile FpsOverlaySnapshot? _overlay;
 
     public NativeFramePresenter(int bufferWidth, int bufferHeight, Action? closed = null, Action<bool>? bypassChanged = null)
     {
@@ -78,6 +80,8 @@ public sealed class NativeFramePresenter : IDisposable
     }
 
     public void Enqueue(ScheduledFrame frame) => _frames.Enqueue(frame);
+
+    public void UpdateOverlay(FpsOverlaySnapshot snapshot) => _overlay = snapshot;
 
     public void Stop()
     {
@@ -182,6 +186,12 @@ public sealed class NativeFramePresenter : IDisposable
                 {
                     Interlocked.Increment(ref _bypassedFrames);
                     continue;
+                }
+
+                var overlay = _overlay;
+                if (overlay is { Visible: true })
+                {
+                    FpsOverlayCompositor.Draw(frame.Bgra, frame.Width, frame.Height, overlay);
                 }
 
                 // A frame that is already far past its slot would only add lag: skip it.
