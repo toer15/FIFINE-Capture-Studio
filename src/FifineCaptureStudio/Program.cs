@@ -2,7 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Threading;
 using Velopack;
 
 namespace FifineCaptureStudio;
@@ -13,6 +16,9 @@ namespace FifineCaptureStudio;
 /// </summary>
 public static class Program
 {
+    private const string InstanceMutexName = @"Local\FifineCaptureStudio.SingleInstance";
+    private const string ActivationEventName = @"Local\FifineCaptureStudio.Activate";
+
     [STAThread]
     public static void Main(string[] args)
     {
@@ -50,9 +56,112 @@ public static class Program
             return;
         }
 
-        var app = new App();
-        app.InitializeComponent();
-        app.Run();
+        // Keep one normal app process per Windows session. The event is created before the mutex
+        // so an early second launch can always wake the first one instead of disappearing silently.
+        using var activation = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationEventName);
+        using var mutex = new Mutex(true, InstanceMutexName, out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            try
+            {
+                activation.Set();
+            }
+            catch
+            {
+                // The first instance is already shutting down.
+            }
+
+            return;
+        }
+
+        try
+        {
+            var app = new App();
+            app.InitializeComponent();
+            StartActivationListener(activation);
+            app.Run();
+        }
+        finally
+        {
+            try
+            {
+                mutex.ReleaseMutex();
+            }
+            catch
+            {
+                // The process is exiting; Windows will release the mutex.
+            }
+        }
+    }
+
+    private static void StartActivationListener(EventWaitHandle activation)
+    {
+        var thread = new Thread(() =>
+        {
+            while (true)
+            {
+                try
+                {
+                    activation.WaitOne();
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
+                catch (Exception)
+                {
+                    return;
+                }
+
+                var app = Application.Current;
+                if (app is null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    app.Dispatcher.BeginInvoke(
+                        DispatcherPriority.ApplicationIdle,
+                        new Action(() => BringExistingWindowToFront(app.MainWindow)));
+                }
+                catch (InvalidOperationException)
+                {
+                    return;
+                }
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "FIFINE Capture Studio activation listener"
+        };
+
+        thread.Start();
+    }
+
+    private static void BringExistingWindowToFront(Window? window)
+    {
+        if (window is null)
+        {
+            return;
+        }
+
+        if (!window.IsVisible)
+        {
+            window.Show();
+        }
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+        // Briefly asserting topmost lets Windows bring the existing window forward when another
+        // application currently owns the foreground, without leaving the window pinned on top.
+        window.Topmost = true;
+        window.Topmost = false;
+        window.Focus();
     }
 
     /// <summary>
