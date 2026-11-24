@@ -26,6 +26,9 @@ public static class AppPaths
     public static string ReplayDir { get; } = Path.Combine(Root, "replaybuffer");
     public static string RecordPartsDir { get; } = Path.Combine(Root, "recording-parts");
     public static string SettingsFile { get; } = Path.Combine(Root, "settings.json");
+
+    /// <summary>Last known-good copy of <see cref="SettingsFile"/>, used when the main file is damaged.</summary>
+    public static string SettingsBackupFile { get; } = Path.Combine(Root, "settings.backup.json");
     public static string AppDir { get; } = AppContext.BaseDirectory;
 
     /// <summary>

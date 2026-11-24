@@ -20,6 +20,19 @@ public partial class App : Application
         Services = new AppServices();
         ViewModel = new StudioViewModel(Services);
 
+        // Windows shutdown/logoff does not always run the normal closing path; flush there too.
+        Microsoft.Win32.SystemEvents.SessionEnding += (_, _) =>
+        {
+            try
+            {
+                Services.Settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Could not save settings on session end: " + ex.Message);
+            }
+        };
+
         if (e.Args.Contains("--smoke"))
         {
             RunSmokeTest();

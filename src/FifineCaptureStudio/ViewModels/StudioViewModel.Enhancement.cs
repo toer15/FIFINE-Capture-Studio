@@ -154,7 +154,16 @@ public sealed partial class StudioViewModel
     public bool QuickPanelOpen
     {
         get => _quickPanelOpen;
-        set => Set(ref _quickPanelOpen, value);
+        set
+        {
+            if (!Set(ref _quickPanelOpen, value))
+            {
+                return;
+            }
+
+            Config.Ui.QuickPanelOpen = value;
+            _services.Settings.SaveSoon();
+        }
     }
 
     public bool EnhancementDenoise
@@ -368,6 +377,8 @@ public sealed partial class StudioViewModel
 
     private void InitializeEnhancement()
     {
+        _quickPanelOpen = Config.Ui.QuickPanelOpen;
+
         ApplyEnhancementProfileCommand = new RelayCommand(p =>
         {
             if (p is EnhancementProfile profile)

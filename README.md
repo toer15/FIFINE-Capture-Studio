@@ -23,13 +23,13 @@ allows, record, save replays and watch performance. It is not a video-production
 | Encoding | Encoder list from `ffmpeg -encoders`, each candidate proven with a real 6-frame encode before it is offered (NVENC / AMF / Quick Sync / Media Foundation / x264 / x265 / SVT-AV1) |
 | Recording | Part files encoded to MP4/MKV, graceful FFmpeg shutdown (`q`), concat via the concat demuxer with `-c copy`, `.fifine.json` sidecar, ffprobe metadata |
 | Pause / resume | Finalises the current part safely, restarts preview, then continues into a new part that is concatenated on stop |
-| Instant replay | `-f segment -segment_time 2 -segment_wrap N` ring in `%LOCALAPPDATA%\FifineCaptureStudio\replaybuffer`; saving concatenates the newest segments |
+| Instant replay | `-f segment -segment_time 2 -segment_wrap N` ring in `%LOCALAPPDATA%\FifineCaptureStudioData\replaybuffer`; saving concatenates the newest segments |
 | Audio | WASAPI shared-mode capture and system loopback through NAudio, own float mixer, resampling to 48 kHz stereo, per-channel gain/mute/monitor/delay, true peak meters, PCM pushed to FFmpeg over named pipes |
 | Monitoring | WASAPI render with drift compensation; the mix that is recorded is the mix you hear |
 | Performance | `GetSystemTimes` for CPU, GPU Engine performance counters for GPU/encode utilisation, `GlobalMemoryStatusEx` for RAM, disk free space, measured frame gaps |
 | Controllers | XInput (Xbox-compatible pads) and Sony HID reports (DualSense/DualShock 4) — observation only |
 | Library | ffprobe metadata, generated thumbnails, search, filters, sort, rename, delete, reveal, play |
-| Settings | JSON at `%LOCALAPPDATA%\FifineCaptureStudio\settings.json`, atomic writes, applied live |
+| Settings | JSON at `%LOCALAPPDATA%\FifineCaptureStudioData\settings.json`, atomic writes with a last-good backup, versioned schema, applied live. Window placement, last page and preview layout are saved too, so every change survives a restart and an update |
 | Capture modes | HDMI capture card, Universal Software Capture (picks card → display → window), FIFINE PC Network Capture, Console Network Capture, PC Direct Capture. Unavailable modes stay listed with the reason instead of being hidden |
 | Capture quality | Auto / 480p / 720p / 1080p / 1440p / 2160p dropdown built from the source's real height. Sizes above the source are offered but flagged as upscaled, and the encoder does the scaling so passthrough and preview are untouched |
 | FPS | Only rates the source reports are listed; 4K120 is never offered unless the driver exposes it |
@@ -124,12 +124,13 @@ installer/          Inno Setup definition
 
 | Path | Contents |
 | --- | --- |
-| `%LOCALAPPDATA%\FifineCaptureStudio\settings.json` | all persisted settings |
-| `%LOCALAPPDATA%\FifineCaptureStudio\logs\capture-studio.log` | rolling log |
-| `%LOCALAPPDATA%\FifineCaptureStudio\ffmpeg\` | downloaded FFmpeg build |
-| `%LOCALAPPDATA%\FifineCaptureStudio\recording-parts\` | in-progress parts, cleaned after finalising |
-| `%LOCALAPPDATA%\FifineCaptureStudio\replaybuffer\` | rolling replay segments |
-| `%LOCALAPPDATA%\FifineCaptureStudio\cache\thumbs\` | generated thumbnails |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\settings.json` | all persisted settings, including window/page/preview state |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\settings.backup.json` | last good copy, used automatically if the main file is damaged or missing |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\logs\capture-studio.log` | rolling log |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\ffmpeg\` | downloaded FFmpeg build |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\recording-parts\` | in-progress parts, cleaned after finalising |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\replaybuffer\` | rolling replay segments |
+| `%LOCALAPPDATA%\FifineCaptureStudioData\cache\thumbs\` | generated thumbnails |
 | `%USERPROFILE%\Videos\FIFINE Capture Studio\` | default recordings folder (falls back to LocalAppData when unavailable) |
 
 ## Keyboard shortcuts
@@ -214,6 +215,7 @@ FIFINE Capture Studio ships through GitHub Releases and updates itself with
 | Notification | In-app banner with version, release notes, Download, Install and restart, Remind me later |
 | Guard | `Install and restart` refuses while a recording is running, so gameplay is never cut off |
 | Data location | `%LOCALAPPDATA%\FifineCaptureStudioData` — deliberately outside the Velopack install folder, with a one-time migration from the old in-install layout |
+| User changes kept | Every edit is written to disk as it happens (coalesced for sliders), flushed again before the updater restarts the app, and backed up. A schema number plus per-version normalisation migrates older files forward without resetting anything, and unknown fields from newer builds are preserved instead of being dropped |
 
 The banner, toggles and About page read their values from the real `UpdateManager`; when the app
 runs from `bin/` (a development build) it says so instead of pretending an update is possible.

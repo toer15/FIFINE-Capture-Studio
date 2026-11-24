@@ -239,6 +239,26 @@ public enum UpdateChannel
     Beta
 }
 
+/// <summary>
+/// Desktop and navigation state the user changes by using the app. Kept with the other settings so
+/// the window, the page they were on and their preview layout come back exactly as they left them.
+/// </summary>
+public sealed class UiSettings
+{
+    /// <summary>Null means "let Windows centre the window" (first run, or the monitor is gone).</summary>
+    public double? WindowLeft { get; set; }
+    public double? WindowTop { get; set; }
+    public double WindowWidth { get; set; } = 1600;
+    public double WindowHeight { get; set; } = 920;
+    public bool WindowMaximized { get; set; }
+    public string LastPage { get; set; } = "dashboard";
+    public double PreviewScale { get; set; } = 1.0;
+    public bool KeepAspect { get; set; } = true;
+    public bool MinimalPreview { get; set; }
+    public bool QuickPanelOpen { get; set; }
+    public string SettingsCategory { get; set; } = "General";
+}
+
 public sealed class UpdateSettings
 {
     public bool AutoCheckEnabled { get; set; } = true;
@@ -253,7 +273,13 @@ public sealed class UpdateSettings
 
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
+
+    /// <summary>Pages that can be restored at startup, in the same order as the sidebar.</summary>
+    public static readonly string[] KnownPages =
+    {
+        "dashboard", "capture", "recording", "audio", "sources", "enhance", "performance", "library", "settings"
+    };
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GeneralSettings General { get; set; } = new();
@@ -268,7 +294,15 @@ public sealed class AppSettings
     public PlayStationSettings PlayStation { get; set; } = new();
     public XboxSettings Xbox { get; set; } = new();
     public EnhancementSettings Enhancement { get; set; } = new();
+    public UiSettings Ui { get; set; } = new();
     public bool WizardCompleted { get; set; }
+
+    /// <summary>
+    /// Unknown top-level properties from a newer build. Round-tripping them means installing an
+    /// older version (or a build that does not know a field yet) cannot silently delete settings.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
 
     public static void Normalize(AppSettings s)
     {
@@ -285,6 +319,19 @@ public sealed class AppSettings
         }
 
         // Schema 2 added the console streaming settings; defaults above are the migration.
+        // Schema 6 added UI state (window placement, last page, preview layout). Defaults apply
+        // when an older file is loaded; nothing existing is reset.
+        s.Ui ??= new UiSettings();
+        s.Ui.WindowWidth = double.IsFinite(s.Ui.WindowWidth) ? Math.Clamp(s.Ui.WindowWidth, 900, 10000) : 1600;
+        s.Ui.WindowHeight = double.IsFinite(s.Ui.WindowHeight) ? Math.Clamp(s.Ui.WindowHeight, 600, 10000) : 920;
+        s.Ui.PreviewScale = double.IsFinite(s.Ui.PreviewScale) ? Math.Clamp(s.Ui.PreviewScale, 0.3, 1.0) : 1.0;
+        s.Ui.LastPage = KnownPages.Contains(s.Ui.LastPage, StringComparer.OrdinalIgnoreCase)
+            ? s.Ui.LastPage.ToLowerInvariant()
+            : "dashboard";
+        s.Ui.SettingsCategory = string.IsNullOrWhiteSpace(s.Ui.SettingsCategory)
+            ? "General"
+            : s.Ui.SettingsCategory.Trim();
+
         s.PlayStation ??= new PlayStationSettings();
         s.Xbox ??= new XboxSettings();
         s.Enhancement ??= new EnhancementSettings();
@@ -357,28 +404,61 @@ public sealed class SettingsService
     };
 
     private readonly object _gate = new();
-    private DateTime _lastSave = DateTime.MinValue;
+    private readonly string _root;
+    private readonly string _file;
+    private readonly string _backup;
+    private readonly string _broken;
+    private Timer? _debounce;
 
-    public SettingsService()
+    public SettingsService(string? rootDirectory = null)
     {
+        _root = rootDirectory ?? AppPaths.Root;
+        _file = Path.Combine(_root, "settings.json");
+        _backup = Path.Combine(_root, "settings.backup.json");
+        _broken = Path.Combine(_root, "settings.broken.json");
         Current = Load();
     }
 
     public AppSettings Current { get; private set; }
 
+    /// <summary>Location actually used; tests can point this at a temporary folder.</summary>
+    public string SettingsPath => _file;
+
     public event Action<AppSettings>? Saved;
 
-    private static AppSettings Load()
+    private AppSettings Load()
     {
         try
         {
-            AppPaths.EnsureCreated();
-            if (File.Exists(AppPaths.SettingsFile))
+            if (string.IsNullOrWhiteSpace(_root) == false)
             {
-                var json = File.ReadAllText(AppPaths.SettingsFile);
-                var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options) ?? new AppSettings();
-                AppSettings.Normalize(loaded);
-                return loaded;
+                Directory.CreateDirectory(_root);
+            }
+
+            if (File.Exists(_file))
+            {
+                var loaded = TryRead(_file);
+                if (loaded is not null)
+                {
+                    return loaded;
+                }
+
+                Log.Warn("settings.json could not be read; trying the last good backup");
+                TryBackupBrokenFile();
+            }
+            else if (File.Exists(_backup))
+            {
+                Log.Warn("settings.json is missing; restoring the last good backup");
+            }
+
+            if (File.Exists(_backup))
+            {
+                var restored = TryRead(_backup);
+                if (restored is not null)
+                {
+                    Log.Info("Settings restored from " + _backup);
+                    return restored;
+                }
             }
         }
         catch (Exception ex)
@@ -392,13 +472,34 @@ public sealed class SettingsService
         return fresh;
     }
 
-    private static void TryBackupBrokenFile()
+    private static AppSettings? TryRead(string path)
     {
         try
         {
-            if (File.Exists(AppPaths.SettingsFile))
+            var json = File.ReadAllText(path);
+            var loaded = JsonSerializer.Deserialize<AppSettings>(json, Options);
+            if (loaded is null)
             {
-                File.Copy(AppPaths.SettingsFile, AppPaths.SettingsFile + ".broken", true);
+                return null;
+            }
+
+            AppSettings.Normalize(loaded);
+            return loaded;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"Settings file {Path.GetFileName(path)} is unreadable: {ex.Message}");
+            return null;
+        }
+    }
+
+    private void TryBackupBrokenFile()
+    {
+        try
+        {
+            if (File.Exists(_file))
+            {
+                File.Copy(_file, _broken, true);
             }
         }
         catch
@@ -407,19 +508,36 @@ public sealed class SettingsService
         }
     }
 
+    /// <summary>
+    /// Writes the whole settings document atomically: a temporary file is flushed next to the real
+    /// one, then swapped in, and a last-good copy is kept so a crash or bad disk cannot reset the
+    /// user's configuration to defaults.
+    /// </summary>
     public void Save()
     {
         lock (_gate)
         {
+            _debounce?.Dispose();
+            _debounce = null;
+
             try
             {
-                AppPaths.EnsureCreated();
+                Directory.CreateDirectory(_root);
                 AppSettings.Normalize(Current);
                 var json = JsonSerializer.Serialize(Current, Options);
-                var tmp = AppPaths.SettingsFile + ".tmp";
+                var tmp = _file + ".tmp";
                 File.WriteAllText(tmp, json);
-                File.Move(tmp, AppPaths.SettingsFile, true);
-                _lastSave = DateTime.UtcNow;
+                File.Move(tmp, _file, true);
+
+                try
+                {
+                    File.Copy(_file, _backup, true);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("Could not refresh the settings backup: " + ex.Message);
+                }
+
                 Saved?.Invoke(Current);
             }
             catch (Exception ex)
@@ -429,15 +547,16 @@ public sealed class SettingsService
         }
     }
 
-    /// <summary>Coalesced save used by slider drags and other high-frequency edits.</summary>
+    /// <summary>Coalesced save used by slider drags, window moves and other high-frequency edits.</summary>
     public void SaveSoon()
     {
-        if ((DateTime.UtcNow - _lastSave).TotalMilliseconds > 700)
+        lock (_gate)
         {
-            Save();
-            return;
+            _debounce?.Dispose();
+            _debounce = new Timer(_ => Save(), null, 700, Timeout.Infinite);
         }
-
-        _ = Task.Delay(800).ContinueWith(_ => Save(), TaskScheduler.Default);
     }
+
+    /// <summary>Writes any coalesced change immediately. Used before updates restart the app.</summary>
+    public void Flush() => Save();
 }

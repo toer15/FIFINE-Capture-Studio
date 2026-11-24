@@ -269,6 +269,10 @@ public sealed class UpdateService
 
         try
         {
+            // The update restarts the process without a normal window close, so persist every
+            // pending change first; otherwise the last edits made before updating would be lost.
+            _settings.Flush();
+
             Log.Info($"Applying update to {info.TargetFullRelease.Version} and restarting.");
             manager.ApplyUpdatesAndRestart(info.TargetFullRelease);
             return true;

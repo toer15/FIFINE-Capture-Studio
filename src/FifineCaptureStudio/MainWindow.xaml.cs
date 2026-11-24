@@ -24,14 +24,94 @@ public partial class MainWindow : Window
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.FullScreenRequested += ToggleFullScreen;
 
+        RestoreWindowPlacement();
         Loaded += OnLoaded;
         Closing += OnClosing;
         StateChanged += (_, _) => UpdateChrome();
+        LocationChanged += (_, _) => PersistWindowPlacement();
+        SizeChanged += (_, _) => PersistWindowPlacement();
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewKeyUp += OnPreviewKeyUp;
     }
 
     private StudioViewModel ViewModel => App.ViewModel;
+
+    /// <summary>
+    /// Puts the window back where the user left it. Saved coordinates are ignored when the monitor
+    /// they referred to is gone, so the window can never open off-screen after a display change.
+    /// </summary>
+    private void RestoreWindowPlacement()
+    {
+        var ui = ViewModel.Config.Ui;
+
+        if (ui.WindowWidth >= MinWidth && ui.WindowHeight >= MinHeight)
+        {
+            Width = ui.WindowWidth;
+            Height = ui.WindowHeight;
+        }
+
+        if (ui.WindowLeft is { } left && ui.WindowTop is { } top && IsReachable(left, top))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = left;
+            Top = top;
+        }
+
+        if (ui.WindowMaximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+    }
+
+    private static bool IsReachable(double left, double top)
+    {
+        var screenLeft = SystemParameters.VirtualScreenLeft;
+        var screenTop = SystemParameters.VirtualScreenTop;
+        var screenRight = screenLeft + SystemParameters.VirtualScreenWidth;
+        var screenBottom = screenTop + SystemParameters.VirtualScreenHeight;
+
+        // At least the title area and a slice of the window must be on a real screen.
+        return left + 120 > screenLeft && left < screenRight - 120
+            && top + 40 > screenTop && top < screenBottom - 40;
+    }
+
+    /// <summary>Stores the current placement; called on close and when the window is moved or resized.</summary>
+    private void SaveWindowPlacement()
+    {
+        var ui = ViewModel.Config.Ui;
+        ui.WindowMaximized = WindowState == WindowState.Maximized;
+
+        // RestoreBounds tracks the real window rectangle even after native resizes (where Width and
+        // Height keep their XAML values) and also reports the normal bounds while maximised.
+        var bounds = RestoreBounds;
+        if (bounds.IsEmpty || bounds.Width < MinWidth || bounds.Height < MinHeight)
+        {
+            if (WindowState != WindowState.Normal)
+            {
+                return;
+            }
+
+            bounds = new Rect(Left, Top, ActualWidth, ActualHeight);
+        }
+
+        ui.WindowLeft = bounds.Left;
+        ui.WindowTop = bounds.Top;
+        ui.WindowWidth = bounds.Width;
+        ui.WindowHeight = bounds.Height;
+    }
+
+    private void PersistWindowPlacement()
+    {
+        // Destroying the window resets its bounds to the startup values; recording that would
+        // overwrite the placement the user actually left behind.
+        if (_closingHandled)
+        {
+            return;
+        }
+
+        SaveWindowPlacement();
+        ViewModel.Services.Settings.SaveSoon();
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -175,6 +255,17 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _closingHandled = true;
+
+        // Capture window state and any coalesced edits before shutdown tears the services down.
+        try
+        {
+            SaveWindowPlacement();
+            App.Services.Settings.Save();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Could not persist window placement: " + ex.Message);
+        }
 
         try
         {

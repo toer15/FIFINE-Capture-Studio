@@ -112,6 +112,14 @@ public sealed partial class StudioViewModel : ObservableObject
         _services = services;
         _dispatcher = Dispatcher.CurrentDispatcher;
 
+        // Restore the desktop state the user left behind, before anything binds to it.
+        var ui = services.Settings.Current.Ui;
+        _currentPage = NormalizePage(ui.LastPage);
+        _previewScale = ui.PreviewScale;
+        _keepAspect = ui.KeepAspect;
+        _minimalPreview = ui.MinimalPreview;
+        _settingsCategory = string.IsNullOrWhiteSpace(ui.SettingsCategory) ? "General" : ui.SettingsCategory;
+
         VideoDevices = new ObservableCollection<DShowDevice>();
         Displays = new ObservableCollection<DisplayInfo>();
         Windows = new ObservableCollection<WindowInfo>();
@@ -217,11 +225,14 @@ public sealed partial class StudioViewModel : ObservableObject
         get => _currentPage;
         set
         {
+            value = NormalizePage(value);
             if (!Set(ref _currentPage, value))
             {
                 return;
             }
 
+            Config.Ui.LastPage = value;
+            _services.Settings.SaveSoon();
             Raise(nameof(PageTitle));
             Raise(nameof(PageSubtitle));
             if (value == "library")
@@ -254,13 +265,33 @@ public sealed partial class StudioViewModel : ObservableObject
     public double PreviewScale
     {
         get => _previewScale;
-        set => Set(ref _previewScale, Math.Clamp(value, 0.3, 1.0));
+        set
+        {
+            var clamped = Math.Clamp(value, 0.3, 1.0);
+            if (!Set(ref _previewScale, clamped))
+            {
+                return;
+            }
+
+            Config.Ui.PreviewScale = clamped;
+            _services.Settings.SaveSoon();
+            Raise(nameof(PreviewScaleLabel));
+        }
     }
 
     public bool KeepAspect
     {
         get => _keepAspect;
-        set => Set(ref _keepAspect, value);
+        set
+        {
+            if (!Set(ref _keepAspect, value))
+            {
+                return;
+            }
+
+            Config.Ui.KeepAspect = value;
+            _services.Settings.SaveSoon();
+        }
     }
 
     public IReadOnlyList<string> PreviewScales { get; } = new[] { "50%", "75%", "100%" };
@@ -270,7 +301,23 @@ public sealed partial class StudioViewModel : ObservableObject
     public bool MinimalPreview
     {
         get => _minimalPreview;
-        set => Set(ref _minimalPreview, value);
+        set
+        {
+            if (!Set(ref _minimalPreview, value))
+            {
+                return;
+            }
+
+            Config.Ui.MinimalPreview = value;
+            _services.Settings.SaveSoon();
+        }
+    }
+
+    /// <summary>Any unknown page name (older file, newer build, typo) falls back to the dashboard.</summary>
+    private static string NormalizePage(string? page)
+    {
+        var candidate = (page ?? string.Empty).Trim().ToLowerInvariant();
+        return AppSettings.KnownPages.Contains(candidate, StringComparer.Ordinal) ? candidate : "dashboard";
     }
 
     public IReadOnlyList<string> SettingsCategories { get; } = new[]
@@ -283,7 +330,16 @@ public sealed partial class StudioViewModel : ObservableObject
     public string SettingsCategory
     {
         get => _settingsCategory;
-        set => Set(ref _settingsCategory, value);
+        set
+        {
+            if (!Set(ref _settingsCategory, value))
+            {
+                return;
+            }
+
+            Config.Ui.SettingsCategory = value;
+            _services.Settings.SaveSoon();
+        }
     }
 
     public ObservableCollection<EncoderRow> AvailableEncoders { get; } = new();
