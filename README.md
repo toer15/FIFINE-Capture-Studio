@@ -229,7 +229,7 @@ authentication or console video.
 ## Verification performed on this machine
 
 * `dotnet run -- --smoke` loads every page and the wizard in isolation and writes
-  `%LOCALAPPDATA%\FifineCaptureStudio\smoke.txt`; all views report `OK`.
+  `%LOCALAPPDATA%\FifineCaptureStudioData\smoke.txt`; all views report `OK`.
 * Encoder sweep: `h264_amf`, `hevc_amf`, `av1_amf`, `h264_mf`, `libx264`, `libx265`, `libsvtav1`
   pass a real encode; `h264_qsv`, `hevc_qsv`, `av1_qsv`, `hevc_mf`, `*_nvenc` are reported
   unavailable and are not offered.
