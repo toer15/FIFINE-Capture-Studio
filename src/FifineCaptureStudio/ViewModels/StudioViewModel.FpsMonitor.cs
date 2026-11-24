@@ -362,6 +362,7 @@ public sealed partial class StudioViewModel
         Raise(nameof(FpsOverlayShown));
         Raise(nameof(FpsOverlayCorner));
         Raise(nameof(FpsOverlayScale));
+        _nativePresenter?.UpdateOverlay(BuildFpsOverlaySnapshot());
     }
 
     public void RaiseFpsMonitorStats()
