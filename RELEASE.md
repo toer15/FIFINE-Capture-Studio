@@ -51,6 +51,10 @@ that permission exists only inside the workflow. No token is ever compiled into 
 powershell -ExecutionPolicy Bypass -File tools/pack.ps1 -Version 1.0.1
 ```
 
+`vpk` is a .NET global tool that needs a working .NET 10 runtime. If it fails with a missing
+`hostpolicy.dll`, point it at a healthy runtime (`$env:DOTNET_ROOT = "$env:USERPROFILE\.dotnet"`). CI
+installs both the .NET 8 SDK and .NET 10 with `actions/setup-dotnet`, so no extra setup is needed there.
+
 To prove an update works without touching production releases:
 
 ```powershell
