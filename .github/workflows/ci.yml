@@ -35,7 +35,11 @@ jobs:
         run: dotnet build FIFINE.CaptureStudio.sln -c Release --no-restore
 
       - name: Install FFmpeg (console stream decode test)
-        run: choco install ffmpeg -y --no-progress
+        run: |
+          choco install ffmpeg -y --no-progress
+          # Chocolatey's bin directory is not necessarily in the runner process PATH yet.
+          # Publish it for subsequent steps so the existing FFmpeg probe can find the shim.
+          "C:\ProgramData\chocolatey\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Test
         run: dotnet test tests/FifineCaptureStudio.Tests/FifineCaptureStudio.Tests.csproj -c Release --logger "console;verbosity=normal"
