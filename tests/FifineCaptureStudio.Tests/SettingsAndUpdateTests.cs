@@ -22,6 +22,40 @@ public class SettingsMigrationTests
     }
 
     [Fact]
+    public void FreshInstallStillGetsOnboardingOnce()
+    {
+        var fresh = new AppSettings();
+
+        AppSettings.Normalize(fresh);
+
+        Assert.False(fresh.WizardCompleted);
+        Assert.True(fresh.General.ShowWizardOnStartup);
+    }
+
+    [Fact]
+    public void DismissedOnboardingFromOlderBuildStaysDismissed()
+    {
+        var legacy = new AppSettings { SchemaVersion = 3, WizardCompleted = false };
+        legacy.General.ShowWizardOnStartup = false;
+
+        AppSettings.Normalize(legacy);
+
+        Assert.Equal(AppSettings.CurrentSchemaVersion, legacy.SchemaVersion);
+        Assert.True(legacy.WizardCompleted);
+    }
+
+    [Fact]
+    public void CompletedOnboardingSurvivesNormalize()
+    {
+        var settings = new AppSettings { SchemaVersion = 4, WizardCompleted = true };
+        settings.General.ShowWizardOnStartup = true;
+
+        AppSettings.Normalize(settings);
+
+        Assert.True(settings.WizardCompleted);
+    }
+
+    [Fact]
     public void ExistingChoicesSurviveNormalize()
     {
         var settings = new AppSettings

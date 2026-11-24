@@ -189,6 +189,10 @@ public sealed partial class StudioViewModel : ObservableObject
         RunCaptureTestCommand = new AsyncRelayCommand(RunCaptureTestAsync);
         FinishWizardCommand = new AsyncRelayCommand(FinishWizardAsync);
 
+        // Onboarding is an overlay that must not be visible until settings say it is due.
+        // The default state is hidden, so a slow or failed start-up can never leave it on screen.
+        ShowWizard = ShouldShowOnboarding();
+
         _services.Session.StateChanged += () => Dispatch(RaiseCaptureState);
         _services.Session.FrameArrived += OnFrameArrived;
         _services.Session.Notice += (message, error) => Dispatch(() => Notify(message, error));
@@ -849,7 +853,6 @@ public sealed partial class StudioViewModel : ObservableObject
         {
             StatusText = "FFmpeg engine missing";
             Notify("The capture engine (FFmpeg) is not installed. Open Settings and install it to start capturing.", true);
-            ShowWizard = false;
         }
 
         RefreshDevices();
@@ -866,7 +869,7 @@ public sealed partial class StudioViewModel : ObservableObject
 
         StartHotkeys();
 
-        ShowWizard = Config.General.ShowWizardOnStartup && !Config.WizardCompleted;
+        ShowWizard = ShouldShowOnboarding();
         StatusText = _services.Ffmpeg.IsAvailable ? "Capture ready" : "Engine missing";
 
         if (AutoStartSource())
@@ -1757,7 +1760,7 @@ public sealed partial class StudioViewModel : ObservableObject
 
     private int _wizardStep = 1;
 
-    private bool _showWizard = true;
+    private bool _showWizard;
 
     public bool ShowWizard
     {
@@ -1810,9 +1813,16 @@ public sealed partial class StudioViewModel : ObservableObject
         Raise(nameof(WizardStep));
     }
 
+    /// <summary>
+    /// Onboarding runs once per Windows user and never again after it has been completed or
+    /// dismissed. Only a manual "Setup wizard" click in Settings can bring it back.
+    /// </summary>
+    public bool ShouldShowOnboarding() => !Config.WizardCompleted;
+
     public void CloseWizard()
     {
         ShowWizard = false;
+        Config.WizardCompleted = true;
         Config.General.ShowWizardOnStartup = false;
         _services.Settings.Save();
     }

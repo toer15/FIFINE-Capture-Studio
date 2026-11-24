@@ -252,7 +252,7 @@ public sealed class UpdateSettings
 
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GeneralSettings General { get; set; } = new();
@@ -270,6 +270,7 @@ public sealed class AppSettings
 
     public static void Normalize(AppSettings s)
     {
+        var loadedVersion = s.SchemaVersion;
         s.Updates ??= new UpdateSettings();
 
         // Schema 1 had no update settings; the defaults above are the migration.
@@ -284,6 +285,14 @@ public sealed class AppSettings
         // Schema 2 added the console streaming settings; defaults above are the migration.
         s.PlayStation ??= new PlayStationSettings();
         s.Xbox ??= new XboxSettings();
+
+        // Schema 4: onboarding completion is tracked explicitly. Builds before it only cleared the
+        // "show wizard on startup" flag when the wizard was dismissed, so honour that as completion
+        // and never show onboarding to those users again.
+        if (loadedVersion < 4 && !s.WizardCompleted && s.General is { ShowWizardOnStartup: false })
+        {
+            s.WizardCompleted = true;
+        }
         if (s.SchemaVersion < CurrentSchemaVersion)
         {
             s.SchemaVersion = CurrentSchemaVersion;
