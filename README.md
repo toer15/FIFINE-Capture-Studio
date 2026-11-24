@@ -162,7 +162,7 @@ protected-signal message. The app never tries to strip HDCP.
 FIFINE Capture Studio ships through GitHub Releases and updates itself with
 [Velopack](https://docs.velopack.io/) (`Velopack` 1.2.161).
 
-![Updates settings](docs/settings-updates.png)
+![Updates settings](docs/github-update-check.png)
 
 | Piece | Where |
 | --- | --- |
@@ -260,19 +260,22 @@ authentication or console video.
 * No capture card or console was attached, so real UVC capture, passthrough and HDCP
   behaviour remain untested here. No other PC is available, so FIFINE Link Agent and network
   capture remain unimplemented/experimental.
-* **Update system was exercised for real on this machine** (not just compiled):
-  1. `vpk pack` produced `FifineCaptureStudio-win-Setup.exe`, `FifineCaptureStudio-1.0.0-full.nupkg`
-     and the release feed (`releases.win.json`, SHA-256 included).
-  2. The 1.0.0 setup was installed silently into `%LOCALAPPDATA%\FifineCaptureStudio`, and the app
-     ran from the installed path.
-  3. A 1.0.1 package was built and served from a local folder; the installed app checked, downloaded,
-     verified and applied it — the installed executable reports **1.0.1** afterwards and the app
-     restarted by itself.
-  4. A marker file inside the recordings folder survived the update, and the data folder stayed in
+* **The update system was exercised end to end against GitHub Releases** on this machine:
+  1. Tag `v1.0.0` ran the release workflow on a Windows runner: build → tests → version check →
+     publish → `vpk pack` → GitHub Release with `Setup.exe`, full `.nupkg`, portable zip and
+     `releases.win.json` (SHA-256 per asset).
+  2. `v1.0.1` was tagged and published the same way, producing a **delta** package on top of 1.0.0.
+  3. The released 1.0.0 installer was downloaded from GitHub and installed silently, then started.
+  4. The installed app checked GitHub, found 1.0.1, downloaded it (auto-download), showed
+     “Update ready to install”, and “Install and restart” applied it. After the automatic restart the
+     installed executable reports **1.0.1** and the app is running again.
+  5. A marker file in the recordings folder and `settings.json` survived; everything stayed in
      `%LOCALAPPDATA%\FifineCaptureStudioData`, outside the replaced installation.
-* What was **not** verified here: a download from GitHub Releases itself, because the repository's
-  first release is created by the workflow after this commit. The update test used Velopack's local
-  file source, which exercises the same check → download → SHA-256 verify → apply → restart path.
-  Signing is not configured, so Windows may warn about an unsigned installer.
+  6. A local `--update-test` run additionally proved the same pipeline without GitHub.
+* Settings → Updates, the About panel and the update banner were checked visually on the installed
+  build (screenshots in `docs/`). Beta-channel separation is enforced by asking GitHub only for
+  pre-releases when the Beta channel is selected; a real beta release has not been published yet, so
+  that path is covered by the filter, not by a live download.
+* Signing is not configured, so Windows SmartScreen may warn about the unsigned installer.
 
 Screenshots in `docs/` are captures of this build on this machine.

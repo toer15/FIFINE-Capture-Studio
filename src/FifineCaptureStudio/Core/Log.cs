@@ -38,8 +38,23 @@ public static class Log
         Info("=== FIFINE Capture Studio " + Version() + " starting ===");
     }
 
-    public static string Version() =>
-        typeof(Log).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+    /// <summary>
+    /// The build's semantic version. AssemblyVersion stays fixed for binding stability, so the
+    /// informational version ("1.0.1+<sha>") is what users must see.
+    /// </summary>
+    public static string Version()
+    {
+        var informational = System.Reflection.CustomAttributeExtensions
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(Log).Assembly)
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            return informational.Split('+')[0];
+        }
+
+        return typeof(Log).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+    }
 
     public static void Info(string message) => Write("INFO", message);
     public static void Warn(string message) => Write("WARN", message);
