@@ -21,6 +21,9 @@ public enum OverlayCorner
 /// name is checked before it is reused so a recycled PID can never point at another program.</summary>
 public sealed class FpsMonitorSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
+
     public bool OverlayVisible { get; set; } = true;
     public OverlayCorner OverlayCorner { get; set; } = OverlayCorner.TopLeft;
     public double OverlayScale { get; set; } = 1.0;

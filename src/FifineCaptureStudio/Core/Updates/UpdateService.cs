@@ -245,7 +245,29 @@ public sealed class UpdateService
     }
 
     /// <summary>
-    /// Applies the downloaded update and restarts. Refuses while recording so gameplay is never cut.
+    /// Persists pending settings before an update. The restart is refused when this returns false;
+    /// the method is public so the gate can be verified without a real Velopack installation.
+    /// </summary>
+    public bool TryPersistBeforeUpdate(out string refusal)
+    {
+        refusal = string.Empty;
+        var result = _settings.TryFlush();
+        if (result.Success)
+        {
+            return true;
+        }
+
+        refusal =
+            "The update was not applied because your settings could not be saved safely. " +
+            (result.ErrorMessage ?? "The settings file could not be written.") +
+            " Fix the disk or permissions problem, then try the update again.";
+        SetState(UpdateStage.Failed, refusal);
+        return false;
+    }
+
+    /// <summary>
+    /// Applies the downloaded update and restarts. Refuses while recording so gameplay is never cut,
+    /// and refuses when pending settings cannot be persisted so the update cannot lose user changes.
     /// </summary>
     public bool ApplyAndRestart(bool isRecording, out string refusal)
     {
@@ -271,7 +293,10 @@ public sealed class UpdateService
         {
             // The update restarts the process without a normal window close, so persist every
             // pending change first; otherwise the last edits made before updating would be lost.
-            _settings.Flush();
+            if (!TryPersistBeforeUpdate(out refusal))
+            {
+                return false;
+            }
 
             Log.Info($"Applying update to {info.TargetFullRelease.Version} and restarting.");
             manager.ApplyUpdatesAndRestart(info.TargetFullRelease);

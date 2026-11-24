@@ -272,10 +272,11 @@ public partial class MainWindow : Window
         _closingHandled = true;
 
         // Capture window state and any coalesced edits before shutdown tears the services down.
+        SettingsSaveResult? settingsSave = null;
         try
         {
             SaveWindowPlacement();
-            App.Services.Settings.Save();
+            settingsSave = App.Services.Settings.TrySave();
         }
         catch (Exception ex)
         {
@@ -303,6 +304,17 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             Log.Error("Shutdown failed", ex);
+        }
+
+        if (settingsSave is { Success: false })
+        {
+            MessageBox.Show(
+                "Your settings could not be saved while closing.\n\n" +
+                (settingsSave.ErrorMessage ?? "The settings file could not be written.") +
+                "\n\nYour previous settings file has been left untouched.",
+                "FIFINE Capture Studio",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
 
         Application.Current.Shutdown();

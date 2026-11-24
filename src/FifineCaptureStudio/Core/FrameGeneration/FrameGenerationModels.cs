@@ -22,6 +22,9 @@ public enum FrameGenerationLatency
 /// </summary>
 public sealed class FrameGenerationSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, System.Text.Json.JsonElement>? Unknown { get; set; }
+
     public bool Enabled { get; set; }
     public int Multiplier { get; set; } = 2;
     public int TargetOutputFps { get; set; }

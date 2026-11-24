@@ -68,6 +68,9 @@ public enum RateControlMode
 
 public sealed class HotkeySettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public string ToggleRecording { get; set; } = "Ctrl+F9";
     public string PauseRecording { get; set; } = "Ctrl+F10";
     public string SaveReplay { get; set; } = "Ctrl+F8";
@@ -77,6 +80,9 @@ public sealed class HotkeySettings
 
 public sealed class GeneralSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public bool LaunchOnStartup { get; set; }
     public string Language { get; set; } = "English";
     public string Theme { get; set; } = "Midnight";
@@ -88,6 +94,9 @@ public sealed class GeneralSettings
 
 public sealed class CaptureSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public CaptureSourceKind SourceKind { get; set; } = CaptureSourceKind.CaptureCard;
     public string VideoDeviceName { get; set; } = string.Empty;
     public string VideoDeviceId { get; set; } = string.Empty;
@@ -107,6 +116,9 @@ public sealed class CaptureSettings
 /// </summary>
 public sealed class PlayStationSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public string EnginePath { get; set; } = string.Empty;
     public string HostId { get; set; } = string.Empty;
     public string ConsoleName { get; set; } = string.Empty;
@@ -136,6 +148,9 @@ public sealed class PlayStationSettings
 /// <summary>Xbox account and console selection. The token is DPAPI-protected.</summary>
 public sealed class XboxSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public string Gamertag { get; set; } = string.Empty;
     public string Xuid { get; set; } = string.Empty;
     public string ConsoleId { get; set; } = string.Empty;
@@ -150,6 +165,9 @@ public sealed class XboxSettings
 
 public sealed class LowLatencySettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public LowLatencyMode Mode { get; set; } = LowLatencyMode.UltraLow;
     public BufferMode VideoBuffer { get; set; } = BufferMode.Low;
     public int VideoBufferMs { get; set; } = 120;
@@ -160,6 +178,9 @@ public sealed class LowLatencySettings
 
 public sealed class RecordingSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public string Directory { get; set; } = AppPaths.DefaultRecordingsDir;
     public int Width { get; set; } = 1920;
     public int Height { get; set; } = 1080;
@@ -181,6 +202,9 @@ public sealed class RecordingSettings
 
 public sealed class AudioChannelSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public string Role { get; set; } = "game";
     public string DisplayName { get; set; } = "Audio";
     public string DeviceId { get; set; } = string.Empty;
@@ -194,6 +218,9 @@ public sealed class AudioChannelSettings
 
 public sealed class AudioSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public int SampleRate { get; set; } = 48000;
     public int ChannelCount { get; set; } = 2;
     public bool MonitoringEnabled { get; set; } = true;
@@ -222,6 +249,9 @@ public sealed class AudioSettings
 
 public sealed class PerformanceSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public bool GpuAcceleration { get; set; } = true;
     public bool HardwareEncoding { get; set; } = true;
     public bool PowerSavingWhenIdle { get; set; } = true;
@@ -231,6 +261,9 @@ public sealed class PerformanceSettings
 
 public sealed class ReplaySettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public bool Enabled { get; set; }
     public int DurationSeconds { get; set; } = 30;
 }
@@ -247,6 +280,9 @@ public enum UpdateChannel
 /// </summary>
 public sealed class UiSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     /// <summary>Null means "let Windows centre the window" (first run, or the monitor is gone).</summary>
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
@@ -263,6 +299,9 @@ public sealed class UiSettings
 
 public sealed class UpdateSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public bool AutoCheckEnabled { get; set; } = true;
     public bool AutoDownload { get; set; } = true;
     public int CheckIntervalMinutes { get; set; } = 360;
@@ -401,6 +440,13 @@ public sealed class AppSettings
     }
 }
 
+/// <summary>Result of a settings write. A backup warning does not make an otherwise persisted save fail.</summary>
+public sealed record SettingsSaveResult(bool Success, string? ErrorMessage = null, string? Warning = null)
+{
+    public static SettingsSaveResult Ok(string? warning = null) => new(true, null, warning);
+    public static SettingsSaveResult Fail(string error) => new(false, error);
+}
+
 public sealed class SettingsService
 {
     private static readonly JsonSerializerOptions Options = new()
@@ -424,6 +470,7 @@ public sealed class SettingsService
         _file = Path.Combine(_root, "settings.json");
         _backup = Path.Combine(_root, "settings.backup.json");
         _broken = Path.Combine(_root, "settings.broken.json");
+        CleanupAbandonedTemporaries();
         Current = Load();
     }
 
@@ -433,6 +480,7 @@ public sealed class SettingsService
     public string SettingsPath => _file;
 
     public event Action<AppSettings>? Saved;
+    public event Action<string>? SaveFailed;
 
     private AppSettings Load()
     {
@@ -465,6 +513,11 @@ public sealed class SettingsService
                 if (restored is not null)
                 {
                     Log.Info("Settings restored from " + _backup);
+                    if (!TryRecreatePrimary(restored, out var recoveryError))
+                    {
+                        Log.Warn("Could not recreate settings.json from the backup: " + recoveryError);
+                    }
+
                     return restored;
                 }
             }
@@ -510,18 +563,111 @@ public sealed class SettingsService
                 File.Copy(_file, _broken, true);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // best effort
+            Log.Warn("Could not preserve the damaged settings file: " + ex.Message);
         }
     }
 
     /// <summary>
-    /// Writes the whole settings document atomically: a temporary file is flushed next to the real
-    /// one, then swapped in, and a last-good copy is kept so a crash or bad disk cannot reset the
-    /// user's configuration to defaults.
+    /// Recreates the primary file from a recovered backup without touching that backup. The write
+    /// uses the same temp + fsync + replace path as a normal save and is read back before success.
     /// </summary>
-    public void Save()
+    private bool TryRecreatePrimary(AppSettings settings, out string error)
+    {
+        try
+        {
+            Directory.CreateDirectory(_root);
+            var json = JsonSerializer.Serialize(settings, Options);
+            WriteAtomicFile(_file, json);
+            if (TryRead(_file) is null)
+            {
+                error = "the recreated settings.json could not be read back";
+                Log.Warn(error);
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private void CleanupAbandonedTemporaries()
+    {
+        // A crash can leave a partial temp file. Only remove stale files so a second instance that
+        // is actively saving is not disturbed.
+        foreach (var path in new[] { _file + ".tmp", _backup + ".tmp" })
+        {
+            try
+            {
+                if (File.Exists(path) &&
+                    DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > TimeSpan.FromMinutes(5))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"Could not clean up abandoned {Path.GetFileName(path)}: {ex.Message}");
+            }
+        }
+    }
+
+    private static void WriteAtomicFile(string path, string contents)
+    {
+        var temporary = path + ".tmp";
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false), 4096, leaveOpen: true))
+            {
+                writer.Write(contents);
+                writer.Flush();
+                // Flush(true) asks Windows to flush the file's data to the volume. A rename of a
+                // fully written temp file is the atomic replacement step.
+                stream.Flush(true);
+            }
+
+            File.Move(temporary, path, true);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+            catch
+            {
+                // The stale-temp cleanup on the next start is the fallback.
+            }
+
+            throw;
+        }
+    }
+
+    private void RaiseSaveFailed(string message)
+    {
+        try
+        {
+            SaveFailed?.Invoke(message);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Settings failure notification could not be delivered: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Writes the whole settings document atomically: a temporary file is flushed to disk next to
+    /// the real one, then swapped in, and a last-good copy is refreshed the same way. Returns the
+    /// actual result so callers such as the updater can refuse to restart after a failed write.
+    /// </summary>
+    public SettingsSaveResult TrySave()
     {
         lock (_gate)
         {
@@ -533,27 +679,45 @@ public sealed class SettingsService
                 Directory.CreateDirectory(_root);
                 AppSettings.Normalize(Current);
                 var json = JsonSerializer.Serialize(Current, Options);
-                var tmp = _file + ".tmp";
-                File.WriteAllText(tmp, json);
-                File.Move(tmp, _file, true);
+                WriteAtomicFile(_file, json);
 
+                string? warning = null;
                 try
                 {
-                    File.Copy(_file, _backup, true);
+                    // Never replace the old backup until the new backup has been completely
+                    // written and flushed. A failed refresh leaves the previous backup intact.
+                    WriteAtomicFile(_backup, json);
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn("Could not refresh the settings backup: " + ex.Message);
+                    warning = "Settings were saved, but the backup could not be refreshed: " + ex.Message;
+                    Log.Warn(warning);
                 }
 
-                Saved?.Invoke(Current);
+                try
+                {
+                    Saved?.Invoke(Current);
+                }
+                catch (Exception ex)
+                {
+                    warning ??= "Settings were saved, but a settings listener failed: " + ex.Message;
+                    Log.Warn("A settings listener failed after saving: " + ex.Message);
+                }
+
+                return SettingsSaveResult.Ok(warning);
             }
             catch (Exception ex)
             {
+                var message = "Could not save settings to " + _file + ": " + ex.Message;
                 Log.Error("Failed to save settings", ex);
+                RaiseSaveFailed(message);
+                return SettingsSaveResult.Fail(message);
             }
         }
     }
+
+    /// <summary>Compat wrapper for existing callers. Use <see cref="TrySave"/> where failure matters.</summary>
+    public void Save() => TrySave();
 
     /// <summary>Coalesced save used by slider drags, window moves and other high-frequency edits.</summary>
     public void SaveSoon()
@@ -565,6 +729,9 @@ public sealed class SettingsService
         }
     }
 
-    /// <summary>Writes any coalesced change immediately. Used before updates restart the app.</summary>
-    public void Flush() => Save();
+    /// <summary>Writes any coalesced change immediately and reports whether it reached disk.</summary>
+    public SettingsSaveResult TryFlush() => TrySave();
+
+    /// <summary>Compat wrapper for callers that do not need the result.</summary>
+    public void Flush() => TrySave();
 }

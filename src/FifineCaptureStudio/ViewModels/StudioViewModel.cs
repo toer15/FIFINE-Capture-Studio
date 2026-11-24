@@ -187,7 +187,15 @@ public sealed partial class StudioViewModel : ObservableObject
         ToggleMuteMicCommand = new RelayCommand(ToggleMuteMic);
         InstallEngineCommand = new AsyncRelayCommand(InstallEngineAsync);
         OpenRecordingsFolderCommand = new RelayCommand(OpenRecordingsFolder);
-        SaveSettingsCommand = new RelayCommand(() => { _services.Settings.Save(); Notify("Settings saved", false); });
+        SaveSettingsCommand = new RelayCommand(() =>
+        {
+            var result = _services.Settings.TrySave();
+            if (result.Success)
+            {
+                Notify("Settings saved", false);
+            }
+            // A failed save is surfaced by the SaveFailed subscription below, including the cause.
+        });
         ResetLowLatencyCommand = new RelayCommand(ResetLowLatency);
         ResetFolderCommand = new RelayCommand(() => RecordingFolder = AppPaths.DefaultRecordingsDir);
         RestartAudioCommand = new AsyncRelayCommand(RestartAudioAsync);
@@ -210,6 +218,7 @@ public sealed partial class StudioViewModel : ObservableObject
         _services.Performance.Sampled += OnSystemSampled;
         _services.Controllers.StateChanged += state => _controller = state;
         _services.Settings.Saved += _ => Dispatch(RaiseAllSettings);
+        _services.Settings.SaveFailed += message => Dispatch(() => Notify(message, true));
         _services.Encoders.VerificationChanged += () => Dispatch(RefreshEncoderRows);
 
         _uiTimer = new DispatcherTimer(DispatcherPriority.Background)

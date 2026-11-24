@@ -1,8 +1,14 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace FifineCaptureStudio.Core.Enhancement;
 
 /// <summary>Persisted enhancement configuration. Values are clamped on load, never trusted.</summary>
 public sealed class EnhancementSettings
 {
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Unknown { get; set; }
+
     public bool Enabled { get; set; }
     public EnhancementProfile Profile { get; set; } = EnhancementProfile.Natural;
     public EnhancementPerformanceMode Performance { get; set; } = EnhancementPerformanceMode.Balanced;

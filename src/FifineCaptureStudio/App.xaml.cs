@@ -25,7 +25,11 @@ public partial class App : Application
         {
             try
             {
-                Services.Settings.Save();
+                var result = Services.Settings.TrySave();
+                if (!result.Success)
+                {
+                    Log.Warn("Could not save settings on session end: " + result.ErrorMessage);
+                }
             }
             catch (Exception ex)
             {

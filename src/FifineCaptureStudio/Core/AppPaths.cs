@@ -8,6 +8,8 @@ namespace FifineCaptureStudio.Core;
 /// deliberately outside the Velopack installation folder, so an update can replace the
 /// application without ever touching recordings, settings or captures.
 /// </summary>
+public sealed record LegacyMigrationResult(bool Complete, IReadOnlyList<string> Report);
+
 public static class AppPaths
 {
     /// <summary>Velopack installs into this folder; it must never hold user data.</summary>
@@ -70,79 +72,194 @@ public static class AppPaths
 
     /// <summary>
     /// Earlier builds stored user data inside the install directory. Move what is ours into the
-    /// new root once, without deleting anything we do not recognise.
+    /// new root, without deleting anything we do not recognise. A partial run records pending and
+    /// is retried on the next start; a complete run is not repeated.
     /// </summary>
-    public static void MigrateLegacyData()
+    public static void MigrateLegacyData() => MigrateLegacyData(LegacyRoot, Root);
+
+    /// <summary>Testable migration with explicit roots. Existing destination data is never replaced.</summary>
+    public static LegacyMigrationResult MigrateLegacyData(string legacyRoot, string root)
     {
+        var report = new List<string>();
         try
         {
-            if (!Directory.Exists(LegacyRoot) || string.Equals(LegacyRoot, Root, StringComparison.OrdinalIgnoreCase))
+            if (!Directory.Exists(legacyRoot) || string.Equals(legacyRoot, root, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return new LegacyMigrationResult(true, report);
             }
 
-            var moved = Path.Combine(Root, "legacy-migration.txt");
-            if (File.Exists(moved))
+            var marker = Path.Combine(root, "legacy-migration.txt");
+            if (IsMigrationComplete(marker))
             {
-                return;
+                return new LegacyMigrationResult(true, report);
             }
 
-            Directory.CreateDirectory(Root);
+            Directory.CreateDirectory(root);
             var entries = new[]
             {
-                "settings.json", "trusted-devices.json", "logs", "cache", "replaybuffer",
-                "recording-parts", "ffmpeg", "Recordings"
+                "settings.json", "settings.backup.json", "settings.broken.json", "trusted-devices.json",
+                "logs", "cache", "replaybuffer", "recording-parts", "ffmpeg", "Recordings"
             };
 
-            var report = new List<string>();
+            var failures = new List<string>();
             foreach (var name in entries)
             {
-                var source = Path.Combine(LegacyRoot, name);
-                var target = Path.Combine(Root, name);
+                var source = Path.Combine(legacyRoot, name);
+                var target = Path.Combine(root, name);
                 try
                 {
-                    if (File.Exists(source) && !File.Exists(target))
+                    if (File.Exists(source))
                     {
-                        File.Move(source, target);
-                        report.Add("moved file " + name);
+                        if (File.Exists(target))
+                        {
+                            report.Add("kept existing " + name);
+                        }
+                        else
+                        {
+                            if (Directory.Exists(target))
+                            {
+                                throw new IOException("the destination path is a directory");
+                            }
+
+                            File.Move(source, target);
+                            report.Add("moved file " + name);
+                        }
                     }
                     else if (Directory.Exists(source))
                     {
-                        Merge(source, target);
-                        report.Add("merged folder " + name);
+                        if (File.Exists(target))
+                        {
+                            throw new IOException("the destination path is a file");
+                        }
+
+                        Merge(source, target, name, report, failures);
                     }
                 }
                 catch (Exception ex)
                 {
-                    report.Add($"could not move {name}: {ex.Message}");
+                    failures.Add($"could not move {name}: {ex.Message}");
                 }
             }
 
-            File.WriteAllLines(moved, report.DefaultIfEmpty("nothing to migrate"));
-            Log.Info("Legacy data migration: " + string.Join("; ", report));
+            var complete = failures.Count == 0;
+            var lines = new List<string>
+            {
+                "status=" + (complete ? "complete" : "pending"),
+                "updatedUtc=" + DateTime.UtcNow.ToString("O")
+            };
+            lines.AddRange(report);
+            lines.AddRange(failures);
+            WriteMigrationMarker(marker, lines);
+
+            var summary = string.Join("; ", lines.Skip(2));
+            Log.Info($"Legacy data migration [{(complete ? "complete" : "pending")}]: " +
+                     (string.IsNullOrEmpty(summary) ? "nothing to migrate" : summary));
+            return new LegacyMigrationResult(complete, lines.AsReadOnly());
         }
         catch (Exception ex)
         {
+            report.Add("migration failed: " + ex.Message);
             Log.Warn("Legacy data migration failed: " + ex.Message);
+            return new LegacyMigrationResult(false, report.AsReadOnly());
         }
     }
 
-    /// <summary>Moves everything from source into target without overwriting existing files.</summary>
-    private static void Merge(string source, string target)
+    private static bool IsMigrationComplete(string marker)
     {
-        Directory.CreateDirectory(target);
+        try
+        {
+            return File.Exists(marker) &&
+                   File.ReadLines(marker).FirstOrDefault()?.Trim()
+                       .Equals("status=complete", StringComparison.OrdinalIgnoreCase) == true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Legacy migration marker could not be read: " + ex.Message);
+            return false;
+        }
+    }
+
+    private static void WriteMigrationMarker(string marker, IReadOnlyList<string> lines)
+    {
+        var temporary = marker + ".tmp";
+        try
+        {
+            File.WriteAllLines(temporary, lines);
+            File.Move(temporary, marker, true);
+        }
+        catch
+        {
+            try
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
+            catch
+            {
+                // Best effort; a missing marker simply makes the next start retry safely.
+            }
+
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Moves everything from source into target without overwriting existing files. A single
+    /// locked file is recorded as a failure but does not stop the rest of the migration.
+    /// </summary>
+    private static void Merge(
+        string source,
+        string target,
+        string relative,
+        List<string> report,
+        List<string> failures)
+    {
+        try
+        {
+            Directory.CreateDirectory(target);
+        }
+        catch (Exception ex)
+        {
+            failures.Add($"could not create {relative}: {ex.Message}");
+            return;
+        }
+
         foreach (var file in Directory.GetFiles(source))
         {
-            var destination = Path.Combine(target, Path.GetFileName(file));
-            if (!File.Exists(destination))
+            var name = Path.GetFileName(file);
+            var destination = Path.Combine(target, name);
+            try
             {
-                File.Move(file, destination);
+                if (File.Exists(destination))
+                {
+                    report.Add("kept existing " + Path.Combine(relative, name));
+                }
+                else if (Directory.Exists(destination))
+                {
+                    failures.Add($"could not move {Path.Combine(relative, name)}: the destination path is a directory");
+                }
+                else
+                {
+                    File.Move(file, destination);
+                    report.Add("moved " + Path.Combine(relative, name));
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"could not move {Path.Combine(relative, name)}: {ex.Message}");
             }
         }
 
         foreach (var folder in Directory.GetDirectories(source))
         {
-            Merge(folder, Path.Combine(target, Path.GetFileName(folder)));
+            var name = Path.GetFileName(folder);
+            var destination = Path.Combine(target, name);
+            if (File.Exists(destination))
+            {
+                failures.Add($"could not merge {Path.Combine(relative, name)}: the destination path is a file");
+                continue;
+            }
+
+            Merge(folder, destination, Path.Combine(relative, name), report, failures);
         }
     }
 

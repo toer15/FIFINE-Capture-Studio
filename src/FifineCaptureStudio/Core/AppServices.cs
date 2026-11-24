@@ -132,7 +132,12 @@ public sealed class AppServices : IAsyncDisposable
         try { await Audio.StopAsync().ConfigureAwait(false); } catch { }
         Audio.Dispose();
 
-        Settings.Save();
+        var save = Settings.TrySave();
+        if (!save.Success)
+        {
+            Log.Warn("Settings were not saved during shutdown: " + save.ErrorMessage);
+        }
+
         Log.Info("=== Shutdown complete ===");
     }
 }
