@@ -1,3 +1,4 @@
+using FifineCaptureStudio.Core.Enhancement;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -252,7 +253,7 @@ public sealed class UpdateSettings
 
 public sealed class AppSettings
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GeneralSettings General { get; set; } = new();
@@ -266,6 +267,7 @@ public sealed class AppSettings
     public UpdateSettings Updates { get; set; } = new();
     public PlayStationSettings PlayStation { get; set; } = new();
     public XboxSettings Xbox { get; set; } = new();
+    public EnhancementSettings Enhancement { get; set; } = new();
     public bool WizardCompleted { get; set; }
 
     public static void Normalize(AppSettings s)
@@ -285,6 +287,8 @@ public sealed class AppSettings
         // Schema 2 added the console streaming settings; defaults above are the migration.
         s.PlayStation ??= new PlayStationSettings();
         s.Xbox ??= new XboxSettings();
+        s.Enhancement ??= new EnhancementSettings();
+        s.Enhancement.Normalize();
 
         // Schema 4: onboarding completion is tracked explicitly. Builds before it only cleared the
         // "show wizard on startup" flag when the wizard was dismissed, so honour that as completion

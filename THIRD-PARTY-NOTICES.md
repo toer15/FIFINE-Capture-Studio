@@ -57,3 +57,25 @@ invokes it as a separate executable (`ffmpeg`, `ffprobe`). It is not redistribut
 
 Blacklight and its noncommercial licence terms are **not** used anywhere in this project, and no
 code or binaries from it are included.
+
+## SharpDX 4.2.0 (MIT)
+
+The GPU enhancement engine uses SharpDX for Direct3D 11 interop. SharpDX is distributed under the
+MIT licence (Copyright (c) 2010-2014 SharpDX SAS). No SharpDX source is modified or bundled as a
+separate executable; the NuGet assemblies ship with the application.
+
+## libplacebo (LGPL-2.1-or-later, via FFmpeg)
+
+Enhanced recordings use FFmpeg's `libplacebo` filter (Vulkan). libplacebo itself is not bundled by
+FIFINE: it is compiled into the FFmpeg build the user installs, and is only used when the user enables
+enhanced recordings. See the FFmpeg build's own licence notes for the exact configuration.
+
+## Vulkan runtime
+
+`libplacebo` runs through the system Vulkan loader and the installed GPU driver (AMD Software:
+Adrenalin). No Vulkan SDK is shipped with FIFINE.
+
+## No AI model files
+
+This project ships no neural-network weights. The enhancement pipeline is a deterministic compute
+pipeline; no model is downloaded at runtime.

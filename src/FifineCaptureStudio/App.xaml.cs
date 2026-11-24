@@ -54,6 +54,7 @@ public partial class App : Application
                      ("RecordingStudio", () => new Views.RecordingStudioView()),
                      ("AudioStudio", () => new Views.AudioStudioView()),
                      ("GamingSources", () => new Views.GamingSourcesView()),
+                     ("GamingEnhancement", () => new Views.EnhancementView()),
                      ("Performance", () => new Views.PerformanceView()),
                      ("Library", () => new Views.LibraryView()),
                      ("Settings", () => new Views.SettingsView()),

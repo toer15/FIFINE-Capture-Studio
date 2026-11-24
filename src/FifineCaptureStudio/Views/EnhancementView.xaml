@@ -1,0 +1,510 @@
+<UserControl x:Class="FifineCaptureStudio.Views.EnhancementView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+        </Style>
+        <Style x:Key="SectionHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{StaticResource TextDim}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,3,0,0" />
+        </Style>
+        <Style x:Key="SliderLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.3" />
+            <Setter Property="Foreground" Value="#FFB9C3D6" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="SliderValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.3" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="MetricLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10.5" />
+            <Setter Property="Foreground" Value="{StaticResource TextFaint}" />
+        </Style>
+        <Style x:Key="MetricValue" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+        </Style>
+        <Style x:Key="ProfileButton" TargetType="Button">
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" CornerRadius="8" Padding="11,6" Background="#FF0F1624"
+                                BorderBrush="#FF25304A" BorderThickness="1">
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="11.5" Foreground="#FFB9C3D6" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#FF3B4A6A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16,12,16,20">
+
+            <!-- header -->
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="{Binding PageTitle}" Style="{StaticResource H1}" />
+                    <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Style="{StaticResource GhostButton}" Height="34" Content="Disable all enhancement"
+                            Command="{Binding DisableEnhancementCommand}" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource AccentButton}" Height="34" Width="132" Content="Open preview"
+                            Command="{Binding NavigateCommand}" CommandParameter="capture" />
+                </StackPanel>
+            </Grid>
+
+            <!-- status strip -->
+            <Border Background="{StaticResource CardGradient}" BorderBrush="#FF232D45" BorderThickness="1"
+                    CornerRadius="12" Padding="14,10" Margin="0,12,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource Green}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding EnhancementAdapterText}" FontSize="12" FontWeight="Medium"
+                                   Foreground="{StaticResource Text}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding EnhancementStatusText}" FontSize="11"
+                                   Foreground="{StaticResource TextDim}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <TextBlock Text="Enable enhancement" Style="{StaticResource Caption}" VerticalAlignment="Center"
+                                   Margin="0,0,8,0" />
+                        <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding EnhancementEnabled, Mode=TwoWay}"
+                                      VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- profiles -->
+                <Border Grid.Row="0" Grid.ColumnSpan="3" Background="{StaticResource CardGradientSoft}"
+                        BorderBrush="#FF222C43" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="ENHANCEMENT PROFILE" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Presets write real processing values. Every slider below stays editable, and choosing a preset never hides what it changes."
+                                   Style="{StaticResource SectionHint}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Style="{StaticResource ProfileButton}" Content="Natural"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="Natural" />
+                            <Button Style="{StaticResource ProfileButton}" Content="Ultra Sharp"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="UltraSharp" />
+                            <Button Style="{StaticResource ProfileButton}" Content="Cinematic"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="Cinematic" />
+                            <Button Style="{StaticResource ProfileButton}" Content="Vibrant"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="Vibrant" />
+                            <Button Style="{StaticResource ProfileButton}" Content="Clean Image"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="CleanImage" />
+                            <Button Style="{StaticResource ProfileButton}" Content="Custom"
+                                         Command="{Binding ApplyEnhancementProfileCommand}" CommandParameter="Custom" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- image enhancement -->
+                <Border Grid.Row="2" Grid.Column="0" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="IMAGE ENHANCEMENT" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Edge-aware denoise, compression-artifact reduction and detail reconstruction run as Direct3D 11 compute passes on each real frame."
+                                   Style="{StaticResource SectionHint}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,4">
+                            <TextBlock Text="Denoise" Style="{StaticResource SliderLabel}" Width="170" />
+                            <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding EnhancementDenoise, Mode=TwoWay}" />
+                            <TextBlock Text="Deblock" Style="{StaticResource SliderLabel}" Width="80" Margin="18,0,0,0" />
+                            <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding EnhancementDeblock, Mode=TwoWay}" />
+                        </StackPanel>
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Compression reduction" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementCompression, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementCompression, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Detail recovery" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementDetail, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementDetail, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Sharpening" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementSharpening, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementSharpening, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Edge clarity" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementEdge, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementEdge, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Texture enhancement" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementTexture, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementTexture, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Anti-aliasing" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementAntiAliasing, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementAntiAliasing, StringFormat={}{0:0.00}}"
+                                       Style="{StaticResource SliderValue}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- super resolution -->
+                <Border Grid.Row="2" Grid.Column="2" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="SUPER RESOLUTION" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="The source frame is kept as-is and reconstructed to the selected output size with a Catmull-Rom resample plus adaptive sharpening."
+                                   Style="{StaticResource SectionHint}" />
+
+                        <TextBlock Text="Target output resolution" Style="{StaticResource SliderLabel}" Margin="0,10,0,3" />
+                        <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding SuperResolutionTargets}"
+                                  SelectedItem="{Binding SelectedSuperResolution, Mode=TwoWay}" />
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Quality preset" Style="{StaticResource SliderLabel}" Margin="0,0,0,3" />
+                                <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding QualityPresets}"
+                                          SelectedItem="{Binding SelectedQualityPreset, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="AI upscaling strength" Style="{StaticResource SliderLabel}" Margin="0,0,0,3" />
+                                <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding UpscaleStrengths}"
+                                          SelectedItem="{Binding SelectedUpscaleStrength, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border Background="#FF0E1624" BorderBrush="#FF1F2A40" BorderThickness="1" CornerRadius="8"
+                                Padding="10,8" Margin="0,10,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="ORIGINAL SOURCE" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementSourceResolutionText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="ENHANCED OUTPUT" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementOutputResolutionText}" Style="{StaticResource MetricValue}"
+                                               Foreground="{StaticResource Cyan}" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="{Binding EnhancementOutputNote}" Style="{StaticResource SectionHint}" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- neural rendering + comparison -->
+                <Border Grid.Row="4" Grid.Column="0" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="NEURAL RENDERING &amp; COMPARISON" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="The enhancement chain runs on the incoming video only; it never needs the game's internal buffers. Hold Tab in Live Capture to see the untouched signal."
+                                   Style="{StaticResource SectionHint}" />
+                        <TextBlock Text="Colour profile" Style="{StaticResource SliderLabel}" Margin="0,10,0,3" />
+                        <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding ColourProfiles}"
+                                  SelectedItem="{Binding SelectedColourProfile, Mode=TwoWay}" />
+                        <TextBlock Text="Preview comparison" Style="{StaticResource SliderLabel}" Margin="0,8,0,3" />
+                        <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding ComparisonModes}"
+                                  SelectedItem="{Binding SelectedComparison, Mode=TwoWay}" />
+                        <TextBlock Text="Split overlays the enhanced result on the right half of the frame; side-by-side shows both signals."
+                                   Style="{StaticResource SectionHint}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- frame generation -->
+                <Border Grid.Row="4" Grid.Column="2" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF2B2A4C" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="FRAME GENERATION" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Not enabled in this build." FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Amber}" Margin="0,8,0,0" />
+                        <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource TextDim}" Margin="0,6,0,0"
+                                   Text="Generated frames require an optical-flow interpolator plus a high-refresh Direct3D presenter. AMD FSR/AFMF operate inside a game's own swapchain and cannot process an external console capture, and FFmpeg's CPU motion interpolation cannot sustain 1080p60 in real time. Until that pipeline is implemented and measured on this GPU, no frame-generation setting is offered rather than showing fabricated FPS." />
+                        <TextBlock Text="Source, generated and display FPS stay separate by design." Style="{StaticResource SectionHint}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- colour -->
+                <Border Grid.Row="6" Grid.Column="0" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="COLOUR &amp; HDR" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Working colour profile" Style="{StaticResource SliderLabel}" Margin="0,8,0,3" />
+                        <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding ColourProfiles}"
+                                  SelectedItem="{Binding SelectedColourProfile, Mode=TwoWay}" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Brightness" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementBrightness, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementBrightness, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Contrast" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementContrast, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementContrast, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Saturation" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementSaturation, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementSaturation, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Vibrance" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementVibrance, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementVibrance, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Gamma" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-0.9" Maximum="0.9"
+                                    Value="{Binding EnhancementGamma, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementGamma, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Colour temperature" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementTemperature, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementTemperature, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="White balance (tint)" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="-1" Maximum="1"
+                                    Value="{Binding EnhancementWhiteBalance, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementWhiteBalance, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Black level" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementBlackLevel, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementBlackLevel, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Shadow detail" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementShadows, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementShadows, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Highlight recovery" Style="{StaticResource SliderLabel}" />
+                            <Slider Grid.Column="1" Style="{StaticResource MixSlider}" Minimum="0" Maximum="1"
+                                    Value="{Binding EnhancementHighlights, Mode=TwoWay}" />
+                            <TextBlock Grid.Column="2" Text="{Binding EnhancementHighlights, StringFormat={}{0:0.00}}" Style="{StaticResource SliderValue}" />
+                        </Grid>
+                        <TextBlock Text="The incoming stream is treated as SDR. HDR tone mapping is only applied when the source actually carries HDR metadata, which capture cards rarely expose; SDR is never converted into fake HDR."
+                                   Style="{StaticResource SectionHint}" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- performance -->
+                <Border Grid.Row="6" Grid.Column="2" Background="{StaticResource CardGradient}"
+                        BorderBrush="#FF232D45" BorderThickness="1" CornerRadius="12" Padding="14,12">
+                    <StackPanel>
+                        <TextBlock Text="PERFORMANCE" Style="{StaticResource SectionTitle}" />
+                        <TextBlock Text="Processing profile" Style="{StaticResource SliderLabel}" Margin="0,8,0,3" />
+                        <ComboBox Style="{StaticResource DarkCombo}" ItemsSource="{Binding PerformanceModes}"
+                                  SelectedItem="{Binding SelectedPerformanceMode, Mode=TwoWay}" />
+                        <TextBlock Text="Ultra Low Latency reduces every pass; Visual Quality spends more GPU time per frame. Stronger processing raises GPU usage and can add preview latency."
+                                   Style="{StaticResource SectionHint}" />
+
+                        <UniformGrid Columns="2" Margin="0,12,0,0">
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,0,5,5">
+                                <StackPanel>
+                                    <TextBlock Text="PROCESSED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementFpsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,0,0,5">
+                                <StackPanel>
+                                    <TextBlock Text="FRAME TIME" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementFrameTimeText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="UPSCALE PASS" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementUpscaleMsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,5,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="NEURAL PASS" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementNeuralMsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="COLOUR PASS" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementColourMsText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,5,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="VRAM USED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementVramText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="0,5,5,0">
+                                <StackPanel>
+                                    <TextBlock Text="FRAMES PROCESSED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementProcessedText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FF0E1624" CornerRadius="8" Padding="10,8" Margin="5,5,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="DROPPED" Style="{StaticResource MetricLabel}" />
+                                    <TextBlock Text="{Binding EnhancementDroppedText}" Style="{StaticResource MetricValue}" />
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <TextBlock Text="Recording output" Style="{StaticResource SectionTitle}" Margin="0,14,0,0" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding RecordingEnhanced, Mode=TwoWay}"
+                                          VerticalAlignment="Center" />
+                            <TextBlock Text="Record the enhanced image instead of the raw capture"
+                                       Style="{StaticResource SliderLabel}" Margin="10,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="Recordings keep the existing encoder and audio pipeline. This applies the GPU colour/sharpening stage to the encoder input; generated frames are never written to a recording."
+                                   Style="{StaticResource SectionHint}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

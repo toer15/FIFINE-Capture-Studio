@@ -188,6 +188,7 @@ public sealed partial class StudioViewModel : ObservableObject
         WizardBackCommand = new RelayCommand(() => { if (WizardStep > 1) WizardStep--; });
         RunCaptureTestCommand = new AsyncRelayCommand(RunCaptureTestAsync);
         FinishWizardCommand = new AsyncRelayCommand(FinishWizardAsync);
+        InitializeEnhancement();
 
         // Onboarding is an overlay that must not be visible until settings say it is due.
         // The default state is hidden, so a slow or failed start-up can never leave it on screen.
@@ -239,6 +240,7 @@ public sealed partial class StudioViewModel : ObservableObject
         new("Recording Studio", "IconRecord", "recording"),
         new("Audio Studio", "IconWave", "audio"),
         new("Gaming Sources", "IconPad", "sources"),
+        new("Gaming Enhancement", "IconSparkle", "enhance"),
         new("Performance Monitor", "IconChart", "performance"),
         new("Recordings Library", "IconLibrary", "library"),
         new("Settings", "IconSettings", "settings")
@@ -310,6 +312,7 @@ public sealed partial class StudioViewModel : ObservableObject
         "recording" => "Recording Studio",
         "audio" => "Audio Studio",
         "sources" => "Gaming Sources",
+        "enhance" => "Gaming Enhancement",
         "performance" => "Performance Monitor",
         "library" => "Recordings Library",
         "settings" => "Settings",
@@ -323,6 +326,7 @@ public sealed partial class StudioViewModel : ObservableObject
         "recording" => "Encoder, container and destination control",
         "audio" => "Capture, mix and monitor every audio source",
         "sources" => "PC, PlayStation 5 and Xbox capture setups",
+        "enhance" => "Real-time GPU image enhancement, super resolution and colour",
         "performance" => "Measured system and pipeline load",
         "library" => "Every clip saved by this studio",
         "settings" => "Preferences, engine and shortcuts",
@@ -1908,6 +1912,7 @@ public sealed partial class StudioViewModel : ObservableObject
         Trim(_ramHistory);
 
         RaiseConsoleState();
+        RaiseEnhancementStats();
         Raise(nameof(FpsText));
         Raise(nameof(FpsChipLive));
         Raise(nameof(OutputFpsLabel));
@@ -2012,6 +2017,20 @@ public sealed partial class StudioViewModel : ObservableObject
 
     private void OnFrameArrived(PreviewFrame frame)
     {
+        OriginalPreviewImage = frame.Image;
+
+        if (_services.Enhancement.ShouldEnhancePreview && !ShowOriginal)
+        {
+            StartEnhancementWorker();
+            if (!_enhanceQueue.TryAdd(frame.Image))
+            {
+                _services.Enhancement.NoteDropped();
+            }
+
+            Interlocked.Exchange(ref _framePending, 1);
+            return;
+        }
+
         if (Interlocked.Exchange(ref _framePending, 1) == 1)
         {
             return;

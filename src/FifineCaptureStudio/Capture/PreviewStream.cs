@@ -210,7 +210,14 @@ internal sealed class PreviewStream : IDisposable
                 return;
             }
 
-            var frame = decoder.Frames[0];
+            // Decode straight to BGRA32 so the GPU path never has to convert WPF bitmaps later:
+            // format conversion of a decoded JPEG must happen where the bitmap was created.
+            BitmapSource frame = decoder.Frames[0];
+            if (frame.Format != System.Windows.Media.PixelFormats.Bgra32)
+            {
+                frame = new FormatConvertedBitmap(frame, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            }
+
             frame.Freeze();
 
             var decodeMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;

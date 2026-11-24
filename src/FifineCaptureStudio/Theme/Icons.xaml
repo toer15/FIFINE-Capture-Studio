@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <StreamGeometry x:Key="IconSparkle">M12,2.6 L13.9,9.1 L20.4,11 L13.9,12.9 L12,19.4 L10.1,12.9 L3.6,11 L10.1,9.1 Z M18.6,15.4 L19.5,18.1 L22.2,19 L19.5,19.9 L18.6,22.6 L17.7,19.9 L15,19 L17.7,18.1 Z</StreamGeometry>
     <StreamGeometry x:Key="IconHome">M3,11 L12,3.5 L21,11 M5.8,9.6 L5.8,20 L18.2,20 L18.2,9.6</StreamGeometry>
     <StreamGeometry x:Key="IconMonitor">M3,4.8 H21 V16 H3 Z M9.2,20 H14.8 M12,16 V20</StreamGeometry>
     <StreamGeometry x:Key="IconRecord">M12,4.6 A7.4,7.4 0 1 1 11.99,4.6 Z</StreamGeometry>

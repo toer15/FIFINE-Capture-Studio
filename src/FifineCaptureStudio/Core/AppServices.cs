@@ -24,6 +24,7 @@ public sealed class AppServices : IAsyncDisposable
         Hotkeys = new HotkeyManager();
         Updates = new Updates.UpdateService(Settings);
         PlayStation = new PlayStationStreamService(Settings, Audio);
+        Enhancement = new Enhancement.EnhancementService(Settings);
         Session = new CaptureSession(Ffmpeg, Settings, Encoders, Audio, PlayStation, () => Displays);
     }
 
@@ -37,6 +38,7 @@ public sealed class AppServices : IAsyncDisposable
     public HotkeyManager Hotkeys { get; }
     public Updates.UpdateService Updates { get; }
     public PlayStationStreamService PlayStation { get; }
+    public Enhancement.EnhancementService Enhancement { get; }
     public CaptureSession Session { get; }
 
     public IReadOnlyList<DShowDevice> VideoDevices { get; private set; } = Array.Empty<DShowDevice>();
@@ -60,6 +62,7 @@ public sealed class AppServices : IAsyncDisposable
 
         Performance.Start(1000);
         Controllers.Start();
+        Enhancement.Initialize();
 
         if (Ffmpeg.IsAvailable)
         {
@@ -119,6 +122,7 @@ public sealed class AppServices : IAsyncDisposable
 
         try { await Session.DisposeAsync().ConfigureAwait(false); } catch { }
         try { await PlayStation.DisposeAsync().ConfigureAwait(false); } catch { }
+        try { Enhancement.Dispose(); } catch { }
         try { await Audio.StopAsync().ConfigureAwait(false); } catch { }
         Audio.Dispose();
 

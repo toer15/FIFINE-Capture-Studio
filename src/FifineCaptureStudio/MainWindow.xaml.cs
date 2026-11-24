@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         StateChanged += (_, _) => UpdateChrome();
         PreviewKeyDown += OnPreviewKeyDown;
+        PreviewKeyUp += OnPreviewKeyUp;
     }
 
     private StudioViewModel ViewModel => App.ViewModel;
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
         "recording" => new RecordingStudioView(),
         "audio" => new AudioStudioView(),
         "sources" => new GamingSourcesView(),
+        "enhance" => new EnhancementView(),
         "performance" => new PerformanceView(),
         "library" => new LibraryView(),
         "settings" => new SettingsView(),
@@ -149,6 +151,14 @@ public partial class MainWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Tab && ViewModel.EnhancementBadgeVisible)
+        {
+            // Hold to compare against the untouched signal; releasing restores the enhanced view.
+            ViewModel.ShowOriginal = true;
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape && ViewModel.ShowWizard)
         {
             ViewModel.CloseWizard();
@@ -190,5 +200,14 @@ public partial class MainWindow : Window
         }
 
         Application.Current.Shutdown();
+    }
+
+    private void OnPreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Tab && ViewModel.ShowOriginal)
+        {
+            ViewModel.ShowOriginal = false;
+            e.Handled = true;
+        }
     }
 }

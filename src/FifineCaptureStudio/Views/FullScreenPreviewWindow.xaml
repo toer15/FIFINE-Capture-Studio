@@ -38,7 +38,43 @@
     </Window.Resources>
 
     <Grid x:Name="Root" Background="Black" MouseMove="OnMouseMove" MouseLeftButtonDown="OnRootClick">
-        <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+        <Grid>
+            <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"
+                   Visibility="{Binding IsComparisonSingle, Converter={StaticResource BoolToVis}}" />
+            <Grid Visibility="{Binding IsComparisonSplit, Converter={StaticResource BoolToVis}}">
+                <Image Source="{Binding OriginalPreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Border HorizontalAlignment="Right" ClipToBounds="True"
+                        Width="{Binding ActualWidth, ElementName=Root, Converter={StaticResource HalfValue}}">
+                    <Image Source="{Binding PreviewImage}" HorizontalAlignment="Right"
+                           Width="{Binding ActualWidth, ElementName=Root}"
+                           Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                </Border>
+            </Grid>
+            <Grid Visibility="{Binding IsComparisonSideBySide, Converter={StaticResource BoolToVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="2" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Image Source="{Binding OriginalPreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Rectangle Grid.Column="1" Fill="#FF8FE9FF" />
+                <Image Grid.Column="2" Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+            </Grid>
+        </Grid>
+
+        <!-- compact enhancement controls while gaming -->
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,18,18,0"
+                Background="#B30A0F1A" BorderBrush="#553B4A6A" BorderThickness="1" CornerRadius="10" Padding="12,7"
+                Visibility="{Binding EnhancementAvailable, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal">
+                <Path Data="{StaticResource IconSparkle}" Stroke="#FF8FE9FF" StrokeThickness="1.5" Width="13" Height="13"
+                      Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding EnhancementBadgeText}" Foreground="#FFE6ECF7" FontSize="11.5" Margin="7,0,10,0"
+                           VerticalAlignment="Center" />
+                <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding EnhancementEnabled, Mode=TwoWay}"
+                              VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
 
         <Border x:Name="Overlay" Opacity="0" IsHitTestVisible="False">
             <Grid>

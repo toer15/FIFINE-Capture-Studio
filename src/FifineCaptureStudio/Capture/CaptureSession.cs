@@ -124,6 +124,10 @@ public sealed class CaptureSession : IAsyncDisposable
     public double PresentLatencyMs => _presentLatencyMs;
     public long PreviewGapCount => _previewGaps;
     public long FramesDecoded => _framesSeen;
+    public int ActiveSourceWidth => _activeOptions?.Source.Width ?? 0;
+    public int ActiveSourceHeight => _activeOptions?.Source.Height ?? 0;
+    public int ActiveOutputWidth => _activeOptions?.EncodeWidth ?? 0;
+    public int ActiveOutputHeight => _activeOptions?.EncodeHeight ?? 0;
     public double RecordingFps => _run?.Fps ?? 0;
     public long RecordingDropped => _run?.Dropped ?? 0;
     public double RecordingBitrateMbps => _run?.BitrateMbps ?? 0;
@@ -877,12 +881,44 @@ public sealed class CaptureSession : IAsyncDisposable
             AudioSampleRate = s.Audio.SampleRate,
             Latency = s.LowLatency.Mode,
             VideoBufferMs = s.LowLatency.VideoBufferMs,
+            EnhancementFilter = BuildRecordingEnhancementFilter(s, Even(width), Even(height)),
             ConsoleVideoPipe = source.Kind == CaptureSourceKind.ConsoleStream ? _console.VideoPipePath ?? string.Empty : string.Empty,
             ConsoleCodec = s.PlayStation.PreferHevc && s.PlayStation.IsPs5 ? "hevc" : "h264"
         };
     }
 
     private static int Even(int value) => value - (value % 2);
+
+    /// <summary>
+    /// Builds the real GPU filter chain used for enhanced recordings. Frame generation is
+    /// deliberately excluded: generated frames are a presentation feature and never written to disk.
+    /// </summary>
+    private static string BuildRecordingEnhancementFilter(AppSettings s, int width, int height)
+    {
+        var e = s.Enhancement;
+        if (!e.Enabled || !e.RecordingEnhanced)
+        {
+            return string.Empty;
+        }
+
+        static string F(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+        var builder = new System.Text.StringBuilder();
+        builder.Append("libplacebo=w=").Append(width)
+            .Append(":h=").Append(height)
+            .Append(":upscaler=lanczos:antiringing=0.4")
+            .Append(e.Denoise ? ":deband=true:deband_iterations=2" : ":deband=false")
+            .Append(":brightness=").Append(F(Math.Clamp(e.Brightness, -1, 1)))
+            .Append(":contrast=").Append(F(Math.Clamp(1 + e.Contrast, 0.1, 3)))
+            .Append(":saturation=").Append(F(Math.Clamp(1 + e.Saturation + e.Vibrance * 0.5, 0, 3)))
+            .Append(":gamma=").Append(F(Math.Clamp(1 + e.Gamma, 0.2, 4)));
+
+        if (e.Sharpening > 0.01)
+        {
+            builder.Append(",cas=strength=").Append(F(Math.Clamp(e.Sharpening, 0, 1)));
+        }
+
+        return builder.ToString();
+    }
 
     public static int EstimateBitrate(int width, int height, int fps, string preset)
     {

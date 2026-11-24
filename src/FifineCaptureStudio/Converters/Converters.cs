@@ -88,3 +88,16 @@ public sealed class BooleanToStretchConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>Returns half of a width/height, used to clip the split comparison overlay.</summary>
+public sealed class HalfValueConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+    {
+        var factor = parameter is string text && double.TryParse(text, out var parsed) ? parsed : 0.5;
+        return value is double d ? d * factor : 0.0;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+}

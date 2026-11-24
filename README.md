@@ -157,6 +157,23 @@ Capture card USB  →  PC USB 3 port
 Switch HDCP off on the console (Settings → System → HDMI) or the card will show a
 protected-signal message. The app never tries to strip HDCP.
 
+## Gaming enhancement
+
+A GPU enhancement pipeline runs on the incoming gameplay itself, so it works with console streams,
+capture cards, displays and windows:
+
+* Direct3D 11 compute passes for edge-aware denoise, deblocking, detail/edge/texture reconstruction,
+  colour grading and Catmull-Rom super resolution with adaptive sharpening.
+* Real source/output resolution reporting (for example 1920 × 1080 → 2560 × 1440), split and
+  side-by-side comparison, hold **Tab** to see the untouched signal, and a panic "Disable all" control.
+* GPU timings, VRAM use, processed FPS and dropped frames are measured with Direct3D timestamp queries.
+* Enhanced recordings use a Vulkan/libplacebo filter chain in the existing encoder, never generated frames.
+* Frame generation is **not** offered: see [docs/ENHANCEMENT.md](docs/ENHANCEMENT.md) for the measured
+  numbers and the honest technical reason no fake 2X/3X/4X switch exists.
+
+On the RX 9070 XT the engine measured 3.9 ms per 1440p frame (~255 fps ceiling) and sustained
+59.6 fps during a live 1080p60 capture. Run `FifineCaptureStudio.exe --enhance-bench 180` to reproduce.
+
 ## Console streaming
 
 PlayStation gameplay can now arrive over the network instead of HDMI. FIFINE starts the

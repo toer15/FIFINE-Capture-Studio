@@ -19,6 +19,12 @@ public static class Program
         // Handles install / update / uninstall fast-exit hooks and then returns for a normal launch.
         VelopackApp.Build().Run();
 
+        if (args.Contains("--enhance-bench"))
+        {
+            Core.Enhancement.EnhancementBench.Run(args);
+            return;
+        }
+
         if (args.Contains("--update-test"))
         {
             var source = args.SkipWhile(a => a != "--update-test").Skip(1).FirstOrDefault();

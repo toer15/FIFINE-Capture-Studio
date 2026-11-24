@@ -35,6 +35,9 @@ public sealed class PipelineOptions
     public LowLatencyMode Latency { get; init; } = LowLatencyMode.Balanced;
     public int VideoBufferMs { get; init; } = 120;
 
+    /// <summary>Real Vulkan/libplacebo filter chain applied to the encoder input when recording enhanced.</summary>
+    public string EnhancementFilter { get; init; } = string.Empty;
+
     public bool HasRecordOutput => !string.IsNullOrEmpty(RecordPath);
     public bool HasRingOutput => !string.IsNullOrEmpty(RingDirectory) && RingSegmentCount > 0;
 }
@@ -239,7 +242,12 @@ public static class PipelineArgs
         }
 
         var recordFilters = new List<string>();
-        if (options.EncodeWidth != options.Source.Width || options.EncodeHeight != options.Source.Height)
+        if (!string.IsNullOrEmpty(options.EnhancementFilter))
+        {
+            // libplacebo performs scaling, colour grading and debanding on the GPU (Vulkan).
+            recordFilters.Add(options.EnhancementFilter);
+        }
+        else if (options.EncodeWidth != options.Source.Width || options.EncodeHeight != options.Source.Height)
         {
             recordFilters.Add($"scale={options.EncodeWidth}:{options.EncodeHeight}:flags=bicubic,setsar=1");
         }
