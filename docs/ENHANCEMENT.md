@@ -93,6 +93,59 @@ The benchmark checks the result by reading back the frame and requiring real col
 sampled pixels, not merely a non-empty buffer. That check is what caught an earlier D3D11 binding bug
 where every pass wrote black; it now fails loudly if the pipeline stops producing image data.
 
+## Stage 2 live acceptance — 2026-11-25
+
+This run used the actual FIFINE Capture Studio window and its normal FFmpeg pipeline, not the isolated
+benchmark. The source was FFmpeg's built-in `testsrc2` at 3840 × 2160; no physical 4K capture card was
+available. UI Automation was used to change the real resolution/FPS controls. The earlier failure of
+that automation was fixed by adding accessible names to the resolution and frame-rate selectors and
+falling back to real mouse input when WPF does not expose `SelectionItemPattern`.
+
+The frames in the acceptance screenshots are real test-pattern content, not placeholders. The live
+side-by-side comparison was also exercised, and the recording frames below were decoded separately to
+check for black or corrupt output.
+
+| live path | source | enhancement input | enhanced output | measured |
+| --- | --- | --- | --- | --- |
+| 4K30 native | 3840 × 2160 @ 30.1 fps | 3840 × 2160 | 3840 × 2160 | decode 8.71 ms (budget 33.3 ms, threshold 15.0 ms), queue 3.0 ms, GPU 3.55 ms, frame total 9.04 ms, 29.6 fps presented, 52 enhancement drops, 186 MB VRAM |
+| 4K30 → 1440 | 3840 × 2160 @ 30.0 fps | 3840 × 2160 | 2560 × 1440 | decode 8.09 ms, queue 3.0 ms, GPU 3.79 ms, frame total 9.70 ms, 169 MB VRAM |
+| 4K60 native | 3840 × 2160 @ 60 fps | 3840 × 2160 initially | 3840 × 2160 | decode 8.3 ms (budget 16.67 ms, threshold 7.5 ms); fallback after exactly 90 consecutive frames |
+
+At 4K30 both native and 1440p targets held the source cadence. The native path used about 2.3 GB of
+process working set (private bytes about 2.5 GB), stable over repeated samples; a fresh lightweight
+1600 px session used 594 MB. There was no continuing growth during the sampled window, but native 4K
+is substantially more memory-hungry than the lightweight path and is reported here rather than hidden.
+
+At 4K60 the measured 8.3 ms decode is 50% of the 16.67 ms frame budget, above the configured 45%
+threshold. After 90 frames the application persisted `fullResolutionPreview = false`, showed the
+explanation in the UI, and returned the preview input to 1600 × 900. The source and recording stayed at
+3840 × 2160. The fallback was also triggered during a real recording by a controlled CPU-constrained
+run: it measured 26.2 ms decode at 30 fps, the recording continued at 3840 × 2160, and the finalized
+file had 30.27 s of video and 30.55 s of audio. Restarting the application kept the setting disabled;
+the full-resolution toggle could then be re-enabled manually at 4K30 and restored native input.
+
+Real recordings produced by those sessions:
+
+| test | output | video | audio | result |
+| --- | --- | --- | --- | --- |
+| original | 3840 × 2160, H.264, 60/1 fps | 30.27 s, 1,816 frames, 331.5 MB | AAC 48 kHz stereo, 30.21 s | real moving test pattern; no black intervals |
+| enhanced | 3840 × 2160, H.264, 60/1 fps | 24.23 s, 1,454 frames, 265.1 MB | AAC 48 kHz stereo, 24.49 s | real `libplacebo`/`cas` filter, PSNR 26.54 against original at 10 s, no black intervals |
+| combined (replay + enhanced + fallback) | 3840 × 2160, H.264, 30/1 fps | 30.27 s, 908 frames, 165.7 MB | AAC 48 kHz stereo, 30.55 s | fallback happened during recording; recording stayed full resolution and finalized |
+
+The enhanced 4K60 recording did **not** sustain real time: a 33 s wall-clock run produced 24.23 s of
+encoded video at about 45 fps with the UI reporting CPU around 90% and `Overloaded`. Adding the replay
+ring at 4K60 made it worse (23 s wall time produced 10.73 s), so that combination is documented as a
+genuine limit, not presented as a passing real-time configuration. The combined 4K30 fallback run was
+also CPU-constrained: its 46 s wall time produced 30.27 s of valid video. The recording stayed full
+resolution and responsive throughout; it did not claim real-time encoding under that synthetic load.
+
+The full test suite is **115 passing**. The new `PreviewFallbackMonitor` tests cover the 45% threshold,
+the exact 89/90-frame boundary, recovery of the consecutive run, and manual re-enable; the
+`NativePipelineTests` cover the 4K test-pattern arguments, native preview sizing, 4K→1440 filtering,
+and the fact that a 1600 px preview fallback leaves the 4K recording filter/output unchanged. A
+`RecordingSessionIntegrationTests` case starts and stops a real `CaptureSession` test-pattern
+recording and probes the finalized file's dimensions, codecs and duration.
+
 Reproduce the headless benchmark (no UI, real GPU work, writes `%LOCALAPPDATA%\FifineCaptureStudioData\enhancement-bench.txt`):
 
 ```
@@ -340,7 +393,7 @@ state and display refresh.
 
 `FpsMonitorTests` covers 30/40/60-in-60 cadences, repeated frames, codec-sized noise, a thin moving
 object on a static scene, static scenes, scene cuts, PresentMon CSV quoting/BOM, multi-chain primary
-selection and settings normalisation. The full suite is **77 passing**.
+selection and settings normalisation. The full suite is **115 passing**.
 
 A live 15 s Performance run with enhancement and the overlay enabled presented **1691 frames at
 119.0 FPS** on the 280 Hz display, with 849 generated frames, 13.87 ms average inference (15.60 ms
@@ -362,8 +415,12 @@ CPU encode-time interpolation and is not this feature.
 * The enhanced preview runs on CPU-decoded MJPEG frames from the FFmpeg subprocess. Native resolution
   input is available, but GPU-native decode/texture sharing is not, so the decode and one CPU→GPU
   upload per displayed frame remain.
-* The 4K native path is GPU-feasible (13.1 ms average here) but upload-bound; the automatic fallback
-  protects 60 fps sources when MJPEG decode cannot hold the budget.
+* The 4K native path is GPU-feasible (13.1 ms average here) but MJPEG-decode-bound at 60 fps. On this
+  machine 4K30 held its cadence; 4K60 measured 8.3 ms decode and triggered the automatic fallback after
+  90 frames. 4K60 enhanced recording with replay did not sustain real time.
+* Native 4K preview working set was about 2.3 GB in this run, versus 594 MB for a fresh lightweight
+  1600 px session. It was stable while sampled, but remains a documented resource cost of the native
+  path.
 * The normal preview and WPF fullscreen comparison still go through the WPF compositor. Only the
   120 FPS frame-generation presenter is a native DXGI surface.
 * Enhancement adds GPU load and preview latency; Ultra Low Latency reduces or disables passes.

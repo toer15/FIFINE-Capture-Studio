@@ -422,12 +422,43 @@ public sealed class AppSettings
         }
 
         // Settings written before the data folder moved still point at the install directory.
+        // Require a directory boundary: the new root is "FifineCaptureStudioData", which also
+        // starts with "FifineCaptureStudio". A plain prefix check appended "Data" on every load.
         if (!string.IsNullOrWhiteSpace(s.Recording.Directory) &&
-            s.Recording.Directory.StartsWith(AppPaths.LegacyRoot, StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(AppPaths.LegacyRoot, AppPaths.Root, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(AppPaths.LegacyRoot, AppPaths.Root, StringComparison.OrdinalIgnoreCase))
         {
-            s.Recording.Directory = AppPaths.Root +
-                                    s.Recording.Directory[AppPaths.LegacyRoot.Length..];
+            var legacyRoot = AppPaths.LegacyRoot.TrimEnd(Path.DirectorySeparatorChar);
+            var legacyPrefix = legacyRoot + Path.DirectorySeparatorChar;
+            if (string.Equals(s.Recording.Directory.TrimEnd(Path.DirectorySeparatorChar), legacyRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                s.Recording.Directory = AppPaths.Root;
+            }
+            else if (s.Recording.Directory.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                s.Recording.Directory = Path.Combine(
+                    AppPaths.Root,
+                    s.Recording.Directory[legacyPrefix.Length..]);
+            }
+        }
+
+        // Older builds' legacy-folder migration could append "Data" to the new root on every
+        // load. Collapse that artifact back to the real app-data root instead of preserving a
+        // directory that looks valid but is not the application's data folder.
+        if (s.Recording.Directory.StartsWith(AppPaths.Root + "Data", StringComparison.OrdinalIgnoreCase))
+        {
+            var suffix = s.Recording.Directory[AppPaths.Root.Length..];
+            while (suffix.StartsWith("Data", StringComparison.OrdinalIgnoreCase))
+            {
+                suffix = suffix[4..];
+            }
+
+            if (suffix.Length == 0 || suffix[0] == Path.DirectorySeparatorChar
+                                   || suffix[0] == Path.AltDirectorySeparatorChar)
+            {
+                s.Recording.Directory = Path.Combine(AppPaths.Root, suffix.TrimStart(
+                    Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            }
         }
 
         s.Capture.Fps = Math.Clamp(s.Capture.Fps, 24, 240);

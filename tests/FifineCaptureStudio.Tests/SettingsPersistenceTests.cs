@@ -42,6 +42,8 @@ public class SettingsPersistenceTests : IDisposable
         first.Current.Hotkeys.ToggleRecording = "Ctrl+Shift+R";
         first.Current.Enhancement.Enabled = true;
         first.Current.Enhancement.Target = SuperResolutionTarget.P1440;
+        first.Current.Enhancement.FullResolutionPreview = false;
+        first.Current.Enhancement.RecordingEnhanced = true;
         first.Current.Ui.WindowLeft = 120;
         first.Current.Ui.WindowTop = 80;
         first.Current.Ui.WindowWidth = 1720;
@@ -65,6 +67,8 @@ public class SettingsPersistenceTests : IDisposable
         Assert.Equal("Ctrl+Shift+R", second.Current.Hotkeys.ToggleRecording);
         Assert.True(second.Current.Enhancement.Enabled);
         Assert.Equal(SuperResolutionTarget.P1440, second.Current.Enhancement.Target);
+        Assert.False(second.Current.Enhancement.FullResolutionPreview);
+        Assert.True(second.Current.Enhancement.RecordingEnhanced);
 
         Assert.Equal(120, second.Current.Ui.WindowLeft);
         Assert.Equal(80, second.Current.Ui.WindowTop);

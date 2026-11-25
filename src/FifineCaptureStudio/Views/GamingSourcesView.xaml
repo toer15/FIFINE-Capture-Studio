@@ -296,12 +296,16 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="Resolution" Style="{StaticResource SourceLabel}" />
-                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding ResolutionOptions}"
+                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34"
+                                              AutomationProperties.Name="Capture resolution"
+                                              ItemsSource="{Binding ResolutionOptions}"
                                               DisplayMemberPath="Label" SelectedItem="{Binding SelectedResolution, Mode=TwoWay}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
                                     <TextBlock Text="Frame rate" Style="{StaticResource SourceLabel}" />
-                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34" ItemsSource="{Binding FpsOptions}"
+                                    <ComboBox Style="{StaticResource DarkCombo}" Height="34"
+                                              AutomationProperties.Name="Capture frame rate"
+                                              ItemsSource="{Binding FpsOptions}"
                                               DisplayMemberPath="Label" SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
                                 </StackPanel>
                             </Grid>

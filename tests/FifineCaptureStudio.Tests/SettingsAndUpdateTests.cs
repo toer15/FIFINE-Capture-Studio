@@ -1,3 +1,4 @@
+using System.IO;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Pairing;
 using Xunit;
@@ -105,6 +106,57 @@ public class SettingsMigrationTests
         AppSettings.Normalize(settings);
 
         Assert.False(string.IsNullOrWhiteSpace(settings.Recording.Directory));
+    }
+
+    [Fact]
+    public void AppDataRecordingDirectoryIsNotMigratedRepeatedly()
+    {
+        var expected = Path.Combine(AppPaths.Root, "Recordings");
+        var settings = new AppSettings
+        {
+            Recording = new RecordingSettings { Directory = expected }
+        };
+
+        AppSettings.Normalize(settings);
+        AppSettings.Normalize(settings);
+
+        Assert.Equal(expected, settings.Recording.Directory);
+    }
+
+    [Fact]
+    public void RepeatedAppDataRootFromOldMigrationIsRepaired()
+    {
+        var corrupted = AppPaths.Root + "DataDataDataData" + Path.DirectorySeparatorChar + "Recordings";
+        var expected = Path.Combine(AppPaths.Root, "Recordings");
+        var settings = new AppSettings
+        {
+            Recording = new RecordingSettings { Directory = corrupted }
+        };
+
+        AppSettings.Normalize(settings);
+
+        Assert.Equal(expected, settings.Recording.Directory);
+    }
+
+    [Fact]
+    public void LegacyInstallRecordingDirectoryMovesToAppDataOnce()
+    {
+        if (string.Equals(AppPaths.LegacyRoot, AppPaths.Root, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var legacy = Path.Combine(AppPaths.LegacyRoot, "Recordings");
+        var expected = Path.Combine(AppPaths.Root, "Recordings");
+        var settings = new AppSettings
+        {
+            Recording = new RecordingSettings { Directory = legacy }
+        };
+
+        AppSettings.Normalize(settings);
+        AppSettings.Normalize(settings);
+
+        Assert.Equal(expected, settings.Recording.Directory);
     }
 }
 

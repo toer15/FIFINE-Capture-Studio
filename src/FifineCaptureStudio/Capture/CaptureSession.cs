@@ -71,9 +71,7 @@ public sealed class CaptureSession : IAsyncDisposable
     private int _reconnectAttempts;
     private bool _paused;
     private bool _previewFullResolution = true;
-    private double _avgDecodeMs;
-    private int _slowDecodeFrames;
-    private bool _previewFallbackApplied;
+    private readonly PreviewFallbackMonitor _previewLoad = new();
     private DateTime _lastFrameAt = DateTime.MinValue;
     private long _lastDecodeTicks;
     private DateTime _lastFrameWall = DateTime.MinValue;
@@ -659,11 +657,87 @@ public sealed class CaptureSession : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// A persisted output folder can be malformed (for example an old automation left a
+    /// path beyond Windows' limit) or disappear after the settings were saved. Recording must
+    /// still work, so use the normal recordings folder and explain the change instead of failing
+    /// the whole capture session.
+    /// </summary>
+    private string PrepareRecordingDirectory(string? configured, string purpose)
+    {
+        var configuredDirectory = string.IsNullOrWhiteSpace(configured)
+            ? AppPaths.DefaultRecordingsDir
+            : configured;
+
+        if (TryPrepareDirectory(configuredDirectory, out var configuredError))
+        {
+            return configuredDirectory;
+        }
+
+        Log.Warn($"Configured {purpose} directory cannot be used: {configuredError}");
+
+        // Videos can be redirected or protected by Controlled Folder Access even when the
+        // directory itself can be created. Prefer the Videos folder, then the app-data
+        // fallback that is always under this application's own root.
+        var candidates = new[]
+        {
+            AppPaths.DefaultRecordingsDir,
+            Path.Combine(AppPaths.Root, "Recordings"),
+            AppPaths.Root
+        };
+
+        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!TryPrepareDirectory(candidate, out var fallbackError))
+            {
+                Log.Warn($"{purpose} fallback directory cannot be used: {candidate} ({fallbackError})");
+                continue;
+            }
+
+            if (!string.Equals(candidate, configuredDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                _settings.Current.Recording.Directory = candidate;
+                _settings.SaveSoon();
+                Notice?.Invoke(
+                    $"The configured {purpose} folder could not be used. Saving to {candidate} instead.",
+                    true);
+            }
+
+            return candidate;
+        }
+
+        // Let the normal start-recording error path report the original problem rather than
+        // pretending that a recording can be written somewhere none of the locations work.
+        Directory.CreateDirectory(configuredDirectory);
+        return configuredDirectory;
+    }
+
+    private static bool TryPrepareDirectory(string directory, out string? error)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var probe = Path.Combine(directory, ".fifine-write-" + Guid.NewGuid().ToString("N") + ".tmp");
+            using (File.Create(probe))
+            {
+            }
+
+            File.Delete(probe);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or ArgumentException or NotSupportedException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     private string BuildRecordingPath()
     {
         var s = _settings.Current.Recording;
-        var dir = string.IsNullOrWhiteSpace(s.Directory) ? AppPaths.DefaultRecordingsDir : s.Directory;
-        Directory.CreateDirectory(dir);
+        var dir = PrepareRecordingDirectory(s.Directory, "recording");
 
         var platform = _settings.Current.Capture.Platform switch
         {
@@ -738,8 +812,7 @@ public sealed class CaptureSession : IAsyncDisposable
             PlatformKind.Xbox => "Xbox",
             _ => "PC"
         };
-        var dirOut = string.IsNullOrWhiteSpace(s.Directory) ? AppPaths.DefaultRecordingsDir : s.Directory;
-        Directory.CreateDirectory(dirOut);
+        var dirOut = PrepareRecordingDirectory(s.Directory, "replay");
         var target = Path.Combine(dirOut, $"{platform}_Replay_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.mp4");
         var listPath = Path.Combine(AppPaths.CacheDir, "replay-concat-" + Guid.NewGuid().ToString("N") + ".txt");
 
@@ -1149,9 +1222,7 @@ public sealed class CaptureSession : IAsyncDisposable
     public void RequestFullResolutionPreview()
     {
         _previewFullResolution = true;
-        _previewFallbackApplied = false;
-        _slowDecodeFrames = 0;
-        _avgDecodeMs = 0;
+        _previewLoad.RequestFullResolution();
     }
 
     /// <summary>
@@ -1162,7 +1233,7 @@ public sealed class CaptureSession : IAsyncDisposable
     /// </summary>
     private void TrackPreviewDecodeLoad(double decodeMs)
     {
-        if (_activeOptions is null || _previewFallbackApplied || !_settings.Current.Enhancement.Enabled)
+        if (_activeOptions is null || _previewLoad.FallbackApplied || !_settings.Current.Enhancement.Enabled)
         {
             return;
         }
@@ -1172,27 +1243,21 @@ public sealed class CaptureSession : IAsyncDisposable
             return;
         }
 
-        _avgDecodeMs = _avgDecodeMs <= 0 ? decodeMs : (_avgDecodeMs * 0.95) + (decodeMs * 0.05);
         var fps = Math.Max(24, _settings.Current.Capture.Fps);
-        var budget = 1000.0 / fps;
-        if (_avgDecodeMs < Math.Max(4.0, budget * 0.45))
-        {
-            _slowDecodeFrames = 0;
-            return;
-        }
-
-        if (++_slowDecodeFrames < 90)
+        if (!_previewLoad.Observe(decodeMs, fps))
         {
             return;
         }
 
-        _previewFallbackApplied = true;
         _previewFullResolution = false;
         _settings.Current.Enhancement.FullResolutionPreview = false;
         _settings.SaveSoon();
         var width = ActivePreviewWidth;
+        Log.Warn(
+            $"Native preview decode fallback after {_previewLoad.OverloadedFrames} consecutive frames: " +
+            $"{_previewLoad.AverageDecodeMs:0.0} ms average at {fps} fps.");
         Notice?.Invoke(
-            $"Decoding {width} px MJPEG frames averaged {_avgDecodeMs:0.0} ms, which cannot hold {fps} fps here. " +
+            $"Decoding {width} px MJPEG frames averaged {_previewLoad.AverageDecodeMs:0.0} ms, which cannot hold {fps} fps here. " +
             "The enhancement preview returned to 1600 px; the recording and encoded output keep the full source resolution.",
             true);
 

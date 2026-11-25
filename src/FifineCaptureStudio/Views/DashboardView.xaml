@@ -536,6 +536,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Resolution:" Style="{StaticResource RailLabel}" />
                             <ComboBox Grid.Column="1" Style="{StaticResource DarkCombo}" Height="33"
+                                      AutomationProperties.Name="Capture resolution"
                                       ItemsSource="{Binding ResolutionOptions}" DisplayMemberPath="Label"
                                       SelectedItem="{Binding SelectedResolution, Mode=TwoWay}" />
                         </Grid>
@@ -547,6 +548,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="FPS:" Style="{StaticResource RailLabel}" />
                             <ComboBox Grid.Column="1" Style="{StaticResource DarkCombo}" Height="33"
+                                      AutomationProperties.Name="Capture frame rate"
                                       ItemsSource="{Binding FpsOptions}" DisplayMemberPath="Label"
                                       SelectedItem="{Binding SelectedFps, Mode=TwoWay}" />
                         </Grid>
