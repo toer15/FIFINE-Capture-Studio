@@ -22,6 +22,7 @@ public sealed class VideoPipeFeed : IAsyncDisposable
 
     private CancellationTokenSource? _cts;
     private Task? _acceptTask;
+    private readonly TaskCompletionSource _serverReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public VideoPipeFeed()
     {
@@ -33,6 +34,7 @@ public sealed class VideoPipeFeed : IAsyncDisposable
     public long FramesQueued { get; private set; }
     public long FramesDropped { get; private set; }
     public bool HasConsumer => Connected;
+    public Task ServerReady => _serverReady.Task;
 
     /// <summary>Raised when a frame could not be delivered, so the backend should send a keyframe.</summary>
     public event Action? FramesLost;
@@ -81,6 +83,7 @@ public sealed class VideoPipeFeed : IAsyncDisposable
                     1 << 20,
                     1 << 20);
 
+                _serverReady.TrySetResult();
                 await server.WaitForConnectionAsync(token).ConfigureAwait(false);
                 Connected = true;
 

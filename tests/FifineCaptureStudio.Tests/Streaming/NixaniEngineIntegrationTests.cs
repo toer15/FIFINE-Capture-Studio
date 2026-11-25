@@ -86,6 +86,7 @@ public sealed class NixaniEngineIntegrationTests
 
         await using var pipe = new VideoPipeFeed();
         pipe.Open();
+        await pipe.ServerReady.WaitAsync(TimeSpan.FromSeconds(10));
 
         await using var client = new NixaniEngineClient(exe, MockEngine.Arguments());
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
