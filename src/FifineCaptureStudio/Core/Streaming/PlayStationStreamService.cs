@@ -208,7 +208,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     }
 
     /// <summary>Links with the console using the 8-digit code shown on the TV.</summary>
-    public async Task<NixaniRegistration> RegisterAsync(string address, string code, uint consolePin, bool isPs5, CancellationToken token)
+    public async Task<NixaniRegistration> RegisterAsync(string address, string code, uint consolePin, bool isPs5, uint target, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(address))
         {
@@ -249,7 +249,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         NixaniRegistration result;
         try
         {
-            result = await _client!.RegisterAsync(ps.ConsoleAddress, isPs5, linkCode, consolePin,
+            result = await _client!.RegisterAsync(ps.ConsoleAddress, RegistrationTarget(target, isPs5), linkCode, consolePin,
                 accountId, TimeSpan.FromSeconds(90), token).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -276,6 +276,21 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         ConsoleName = ps.ConsoleName;
         SetState(ConsoleStreamState.Idle, $"Registered {ps.ConsoleName}. Ready to start Remote Play.");
         return result;
+    }
+
+    /// <summary>
+    /// chiaki's ChiakiTarget for the console. The engine reports it in discovery (a PS5 is
+    /// 1_000_100, a PS4 is 1_000). Sending a boolean here makes libchiaki build the PS4
+    /// registration search packet, which a PS5 ignores.
+    /// </summary>
+    public static uint RegistrationTarget(uint discovered, bool isPs5)
+    {
+        if (discovered != 0)
+        {
+            return discovered;
+        }
+
+        return isPs5 ? 1_000_100u : 1_000u;
     }
 
     /// <summary>PSN account id, accepted as 16 hex digits or base64 (as chiaki documents it).</summary>

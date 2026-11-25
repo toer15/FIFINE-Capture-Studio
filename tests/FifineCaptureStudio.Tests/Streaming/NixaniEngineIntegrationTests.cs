@@ -43,15 +43,16 @@ public sealed class NixaniEngineIntegrationTests
         Assert.Single(hosts);
         Assert.Equal("Mock PlayStation 5", hosts[0].Name);
         Assert.True(hosts[0].IsPs5);
+        Assert.Equal(1_000_100u, hosts[0].Target);
 
-        var registration = await client.RegisterAsync("127.0.0.1", true, 12345678, 0, new byte[8],
+        var registration = await client.RegisterAsync("127.0.0.1", hosts[0].Target, 12345678, 0, new byte[8],
             TimeSpan.FromSeconds(10), cts.Token);
         Assert.True(registration.Ok);
         Assert.Equal(16, registration.RegistKey.Length);
         Assert.Equal("Mock PlayStation 5", registration.Nickname);
 
         // A rejected code must come back as a failure, not a hang.
-        var rejected = await client.RegisterAsync("127.0.0.1", true, 99999999, 0, new byte[8],
+        var rejected = await client.RegisterAsync("127.0.0.1", hosts[0].Target, 99999999, 0, new byte[8],
             TimeSpan.FromSeconds(10), cts.Token);
         Assert.False(rejected.Ok);
         Assert.Contains("expired", rejected.Error, StringComparison.OrdinalIgnoreCase);

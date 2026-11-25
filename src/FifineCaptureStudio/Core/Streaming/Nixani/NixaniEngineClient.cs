@@ -253,7 +253,7 @@ public sealed class NixaniEngineClient : IAsyncDisposable
     /// <summary>Links with the console using the 8-digit code the console is displaying.</summary>
     public async Task<NixaniRegistration> RegisterAsync(
         string address,
-        bool ps5,
+        uint target,
         uint linkCode,
         uint consolePin,
         byte[] accountId,
@@ -263,7 +263,7 @@ public sealed class NixaniEngineClient : IAsyncDisposable
         _registration = new TaskCompletionSource<NixaniRegistration>(TaskCreationOptions.RunContinuationsAsynchronously);
         var writer = new NxeWriter(NxeMessage.RegistStart)
             .Str(address)
-            .U32(ps5 ? 1u : 0u)
+            .U32(target)
             .Bytes(Pad8(accountId))
             .U32(linkCode)
             .U32(consolePin);

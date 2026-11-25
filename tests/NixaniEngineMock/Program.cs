@@ -108,13 +108,18 @@ while (running)
                 .Str("08.60")
                 .Str("Mock Game")
                 .U8(1)
-                .U32(0));
+                .U32(1_000_100u));
             break;
 
         case NxeMessage.RegistStart:
         {
             var address = reader.Str();
-            reader.U32();
+            var target = reader.U32();
+            if (target != 1_000_100u)
+            {
+                Send(new NxeWriter(NxeMessage.RegistResult).U8(0).Str("Wrong console target."));
+                break;
+            }
             reader.Bytes(8);
             var linkCode = reader.U32();
             var pin = reader.U32();

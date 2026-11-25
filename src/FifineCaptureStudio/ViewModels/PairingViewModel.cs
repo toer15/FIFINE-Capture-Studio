@@ -308,7 +308,8 @@ public sealed class PairingViewModel : INotifyPropertyChanged
                     PairingPlatform.PlayStation,
                     "Remote Play engine",
                     $"{host.StateLabel} · {(host.IsPs5 ? "PS5" : "PS4")} · {host.SystemVersion}",
-                    host.IsPs5));
+                    host.IsPs5,
+                    host.Target));
             }
 
             if (hosts.Count == 0)
@@ -373,6 +374,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
         var address = SelectedDevice.Address;
         var isPs5 = SelectedDevice.IsPs5;
+        var target = SelectedDevice.Target;
 
         // A PS5 validates the PSN account ID during link-code registration. Ask for Sony's
         // sign-in once, then every later pairing only needs the 8 digits shown on the TV.
@@ -397,7 +399,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         var code = Code;
         Code = string.Empty;
         var registration = await _studio.PlayStation
-            .RegisterAsync(address, code, 0, isPs5, CancellationToken.None)
+            .RegisterAsync(address, code, 0, isPs5, target, CancellationToken.None)
             .ConfigureAwait(true);
 
         if (!registration.Ok)
