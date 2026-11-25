@@ -534,6 +534,8 @@ public sealed partial class StudioViewModel
         Raise(nameof(FrameGenBadgeVisible));
         Raise(nameof(FrameGenMultiplierDisplay));
         Raise(nameof(FrameGenFpsDisplay));
+        Raise(nameof(FrameGenOutputReady));
+        Raise(nameof(FrameGenOutputSuffix));
         Raise(nameof(LiveFpsLabel));
     }
 

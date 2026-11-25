@@ -37,11 +37,16 @@
 
         <!-- header -->
         <Grid Grid.Row="0">
-            <StackPanel>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0">
                 <TextBlock Text="Live Capture" Style="{StaticResource H1}" />
                 <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Margin="0,8,0,0">
                 <TextBlock Text="Minimal preview" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ToggleButton Style="{StaticResource Switch}" IsChecked="{Binding MinimalPreview, Mode=TwoWay}" VerticalAlignment="Center" />
                 <Button Style="{StaticResource GhostButton}" Height="34" Margin="14,0,0,0"

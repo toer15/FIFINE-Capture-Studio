@@ -142,7 +142,12 @@ public sealed partial class StudioViewModel
 
     public bool FrameGenBadgeVisible => FrameGenerationEnabled;
 
-    public string FrameGenFpsDisplay => FrameGenerationActive ? FrameGenOutputDisplay : "—";
+    public bool FrameGenOutputReady => FrameGenerationActive &&
+        (_services.FrameGeneration.SourceFps + _services.FrameGeneration.GeneratedFps) > 0;
+
+    public string FrameGenFpsDisplay => FrameGenOutputReady ? FrameGenOutputDisplay : "READY";
+
+    public string FrameGenOutputSuffix => FrameGenOutputReady ? "FPS" : string.Empty;
 
     /// <summary>Game FPS followed by the generated output only while frame generation is enabled.</summary>
     public string LiveFpsLabel => FrameGenerationEnabled
@@ -388,6 +393,8 @@ public sealed partial class StudioViewModel
         Raise(nameof(FrameGenMultiplierDisplay));
         Raise(nameof(FrameGenBadgeVisible));
         Raise(nameof(FrameGenFpsDisplay));
+        Raise(nameof(FrameGenOutputReady));
+        Raise(nameof(FrameGenOutputSuffix));
         Raise(nameof(LiveFpsLabel));
         Raise(nameof(GeneratedFpsDisplay));
         Raise(nameof(PresentedFpsDisplay));

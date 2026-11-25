@@ -32,9 +32,9 @@
                             Visibility="{Binding FrameGenBadgeVisible, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="FRAME GEN" FontSize="9.5" Foreground="#FF9AB7D9" FontWeight="SemiBold" />
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding FrameGenOutputDisplay}" FontSize="24" FontWeight="Bold"
+                        <TextBlock Text="{Binding FrameGenFpsDisplay}" FontSize="24" FontWeight="Bold"
                                    Foreground="#FF8FE9FF" LineHeight="26" />
-                        <TextBlock Text="FPS" FontSize="9.5" Foreground="#FF9AB7D9" FontWeight="SemiBold"
+                        <TextBlock Text="{Binding FrameGenOutputSuffix}" FontSize="9.5" Foreground="#FF9AB7D9" FontWeight="SemiBold"
                                    VerticalAlignment="Bottom" Margin="4,0,0,4" />
                     </StackPanel>
                 </StackPanel>
@@ -43,7 +43,7 @@
                     <TextBlock Text="{Binding GameFpsQualifier}" FontSize="9" Foreground="#FFB7C6DC" />
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <StackPanel Orientation="Horizontal"
-                                    Visibility="{Binding FrameGenBadgeVisible, Converter={StaticResource BoolToVis}}">
+                                    Visibility="{Binding FrameGenOutputReady, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="GEN " FontSize="9.5" Foreground="#FF7E8DA3" />
                             <TextBlock Text="{Binding GeneratedFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
                             <TextBlock Text="   " FontSize="9.5" />

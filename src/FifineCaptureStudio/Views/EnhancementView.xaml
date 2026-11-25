@@ -466,9 +466,9 @@
                                 <StackPanel>
                                     <TextBlock Text="FRAME GEN OUTPUT" Style="{StaticResource MetricLabel}" />
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding FrameGenOutputDisplay}" FontSize="34" FontWeight="Bold"
+                                        <TextBlock Text="{Binding FrameGenFpsDisplay}" FontSize="34" FontWeight="Bold"
                                                    Foreground="{StaticResource Cyan}" />
-                                        <TextBlock Text="fps" FontSize="11" Foreground="{StaticResource TextDim}"
+                                        <TextBlock Text="{Binding FrameGenOutputSuffix}" FontSize="11" Foreground="{StaticResource TextDim}"
                                                    VerticalAlignment="Bottom" Margin="6,0,0,6" />
                                     </StackPanel>
                                     <TextBlock Text="Generated + original frames scheduled by the interpolator; not a target value."

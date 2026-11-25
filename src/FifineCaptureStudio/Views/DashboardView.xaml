@@ -100,7 +100,7 @@
                 <RowDefinition Height="12" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="12" />
-                <RowDefinition Height="216" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- Platform tabs -->
@@ -233,8 +233,9 @@
                 </Grid>
             </Border>
 
-            <!-- Bottom cards -->
-            <Grid Grid.Row="4">
+            <!-- Bottom cards: keep their designed minimum width and scroll instead of overlapping at narrow window sizes. -->
+            <ScrollViewer Grid.Row="4" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <Grid Height="216" MinWidth="960" HorizontalAlignment="Left">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.32*" />
                     <ColumnDefinition Width="10" />
@@ -341,7 +342,7 @@
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,-4,1,0">
                                     <TextBlock Text="FPS" Style="{StaticResource CaptionTiny}" />
-                                    <TextBlock Text="{Binding FrameGenOutputDisplay}" FontSize="10.5" FontWeight="SemiBold"
+                                    <TextBlock Text="{Binding FrameGenFpsDisplay}" FontSize="10.5" FontWeight="SemiBold"
                                                Foreground="#FF8FE9FF" Margin="7,0,0,0"
                                                Visibility="{Binding FrameGenBadgeVisible, Converter={StaticResource BoolToVis}}" />
                                 </StackPanel>
@@ -451,6 +452,7 @@
                     </Grid>
                 </Border>
             </Grid>
+            </ScrollViewer>
         </Grid>
 
         <!-- ======================= RIGHT RAIL ======================= -->
