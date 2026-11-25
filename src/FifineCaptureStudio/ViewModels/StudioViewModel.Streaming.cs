@@ -116,7 +116,7 @@ public sealed partial class StudioViewModel
         Raise(nameof(PlayStationAccountId));
         Raise(nameof(PlayStationAccount));
         Raise(nameof(ConsoleStatusText));
-        return !string.IsNullOrWhiteSpace(PlayStationAccountId);
+        return PlayStationStreamService.IsValidAccountId(PlayStationAccountId);
     }
 
     private ICommand? _signOutPsnCommand;

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Pairing;
+using FifineCaptureStudio.Core.Streaming;
 using FifineCaptureStudio.Views;
 
 namespace FifineCaptureStudio.ViewModels;
@@ -379,10 +380,10 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
         // A PS5 validates the PSN account ID during link-code registration. Ask for Sony's
         // sign-in once, then every later pairing only needs the 8 digits shown on the TV.
-        if (isPs5 && string.IsNullOrWhiteSpace(_studio.PlayStationAccountId))
+        if (isPs5 && !PlayStationStreamService.IsValidAccountId(_studio.PlayStationAccountId))
         {
             Stage = PairingStage.Authenticating;
-            Status = "This PS5 needs a one-time PlayStation Network sign-in before it can accept the code…";
+            Status = "This PS5 needs the PSN account that is active on the console. Sign in with Sony once before it can accept the code…";
             var signedIn = await _studio.SignInPlayStationAsync().ConfigureAwait(true);
             if (!signedIn)
             {

@@ -22,6 +22,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     private TaskCompletionSource<bool>? _streaming;
     private volatile bool _intentionalStop;
     private int _reconnects;
+    private string? _engineRejection;
 
     public PlayStationStreamService(SettingsService settings, AudioEngine audio)
     {
@@ -99,7 +100,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
             client.StateChanged += OnStateChanged;
             client.VideoFrame += OnVideoFrame;
             client.Audio += OnAudio;
-            client.LogMessage += message => Log.Debug(message);
+            client.LogMessage += OnEngineLog;
             client.LoginPinRequested += wrong =>
                 SetState(ConsoleStreamState.Connecting,
                     wrong ? "The console PIN was rejected — enter it again." : "The console is asking for its login PIN.",
@@ -129,6 +130,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
 
             case ConsoleStreamState.Streaming:
                 _reconnects = 0;
+                _engineRejection = null;
                 SetState(ConsoleStreamState.Streaming,
                     string.IsNullOrWhiteSpace(text) ? "Receiving console video." : text);
                 _streaming?.TrySetResult(true);
@@ -141,17 +143,59 @@ public sealed class PlayStationStreamService : IAsyncDisposable
                     break;
                 }
 
+                var stoppedReason = _engineRejection ?? EngineRejectionMessage(text);
                 SetState(ConsoleStreamState.Stopped,
-                    string.IsNullOrWhiteSpace(text) ? "The console ended the stream." : text);
+                    stoppedReason ?? (string.IsNullOrWhiteSpace(text) ? "The console ended the stream." : text),
+                    stoppedReason);
                 _streaming?.TrySetResult(false);
                 _ = AutoReconnectAsync();
                 break;
 
             case ConsoleStreamState.Failed:
-                SetState(ConsoleStreamState.Failed, text, text);
+                var failedReason = _engineRejection ?? EngineRejectionMessage(text);
+                SetState(ConsoleStreamState.Failed,
+                    failedReason ?? (string.IsNullOrWhiteSpace(text) ? "The console rejected the Remote Play session." : text),
+                    failedReason ?? text);
                 _streaming?.TrySetResult(false);
                 break;
         }
+    }
+
+    private void OnEngineLog(string message)
+    {
+        Log.Debug(message);
+        var rejection = EngineRejectionMessage(message);
+        if (rejection is not null)
+        {
+            _engineRejection = rejection;
+        }
+    }
+
+    /// <summary>
+    /// Maps the Remote Play application reasons that are safe to explain. In particular, the PS5
+    /// returns 0x80108b12 when Remote Play is disabled for the active PSN user; chiaki only labels
+    /// it as "unknown", so without this the app reports a misleading generic session timeout.
+    /// </summary>
+    private static string? EngineRejectionMessage(string message)
+    {
+        if (message.Contains("0x80108b12", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("80108b12", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The PS5 rejected Remote Play (0x80108b12). Sign in with the same PSN account that is active on the console, " +
+                   "turn on Settings → System → Remote Play for that user, then pair again with a fresh code.";
+        }
+
+        if (message.Contains("0x80108b02", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The PS5 rejected the PSN account ID. Sign in with the PSN account that is active on the console, then pair again.";
+        }
+
+        if (message.Contains("0x80108b10", StringComparison.OrdinalIgnoreCase))
+        {
+            return "The console is already in a Remote Play session. Close the other Remote Play app, then try again.";
+        }
+
+        return null;
     }
 
     private async Task AutoReconnectAsync()
@@ -235,12 +279,13 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         var accountId = ParseAccountId(ps.AccountId);
 
         // The PS5 validates the PSN account ID during link-code registration and rejects an
-        // all-zero one with CE-110032-7. Stop before the engine sends a request that cannot work.
-        if (isPs5 && accountId.All(value => value == 0))
+        // all-zero one. A previous build stored 000000000000 as a placeholder, so treat any
+        // all-zero value as missing rather than letting the engine start a session that cannot work.
+        if (isPs5 && !IsValidAccountId(ps.AccountId))
         {
-            const string missingAccount = "The PS5 needs your PSN account ID once before it accepts the code. " +
-                "Add it under Gaming Sources → PlayStation Remote Play, then show a new code on the console and press Connect.";
-            SetState(ConsoleStreamState.Failed, missingAccount, "PSN account ID required");
+            const string missingAccount = "This PS5 needs the PSN account that is active on the console. " +
+                "Sign in with Sony, then show a fresh code on the console and press Connect.";
+            SetState(ConsoleStreamState.Failed, missingAccount, "PSN sign-in required");
             return new NixaniRegistration(false, missingAccount, string.Empty, Array.Empty<byte>(), 0,
                 Array.Empty<byte>(), Array.Empty<byte>(), 0, 0);
         }
@@ -294,6 +339,9 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     }
 
     /// <summary>PSN account id, accepted as 16 hex digits or base64 (as chiaki documents it).</summary>
+    /// <summary>True when the text is a real, non-zero 8-byte PSN account ID.</summary>
+    public static bool IsValidAccountId(string? text) => !ParseAccountId(text).All(value => value == 0);
+
     public static byte[] ParseAccountId(string? text)
     {
         var value = (text ?? string.Empty).Trim();
@@ -365,6 +413,14 @@ public sealed class PlayStationStreamService : IAsyncDisposable
             return false;
         }
 
+        if (ps.IsPs5 && !IsValidAccountId(ps.AccountId))
+        {
+            SetState(ConsoleStreamState.Failed,
+                "This PS5 needs the PSN account that is active on the console. Sign in with Sony under Gaming Sources → Platform accounts, then pair again with a fresh console code.",
+                "PSN sign-in required");
+            return false;
+        }
+
         if (!await EnsureEngineAsync(token).ConfigureAwait(false))
         {
             return false;
@@ -376,6 +432,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
             return false;
         }
 
+        _engineRejection = null;
         _intentionalStop = false;
         _pipe ??= CreatePipe();
 
@@ -412,9 +469,10 @@ public sealed class PlayStationStreamService : IAsyncDisposable
             if (!IsStreaming)
             {
                 await StopSessionAsync().ConfigureAwait(false);
+                var reason = LastError ?? _engineRejection;
                 SetState(ConsoleStreamState.Failed,
-                    LastError ?? "The console did not start streaming. Check Remote Play, the console's network and that it is not in rest mode.",
-                    LastError ?? "Session timeout");
+                    reason ?? "The console did not start streaming. Check Remote Play, the console's network and that it is not in rest mode.",
+                    reason ?? "Session timeout");
                 return false;
             }
         }

@@ -155,6 +155,19 @@ public sealed class NixaniEngineIntegrationTests
     }
 
     [Fact]
+    public void AccountId_validation_rejects_placeholder_zero_ids()
+    {
+        Assert.False(PlayStationStreamService.IsValidAccountId(null));
+        Assert.False(PlayStationStreamService.IsValidAccountId(string.Empty));
+        Assert.False(PlayStationStreamService.IsValidAccountId("000000000000"));
+        Assert.False(PlayStationStreamService.IsValidAccountId("0000000000000000"));
+        Assert.False(PlayStationStreamService.IsValidAccountId(Convert.ToBase64String(new byte[8])));
+        Assert.True(PlayStationStreamService.IsValidAccountId("0102030405060708"));
+        Assert.True(PlayStationStreamService.IsValidAccountId(
+            Convert.ToBase64String(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })));
+    }
+
+    [Fact]
     public void Console_settings_migrate_and_are_normalised()
     {
         var settings = new AppSettings
