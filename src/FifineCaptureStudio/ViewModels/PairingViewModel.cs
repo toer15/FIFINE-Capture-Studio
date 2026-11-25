@@ -23,7 +23,6 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         Devices = new ObservableCollection<PairingDevice>();
         TrustedDevices = new ObservableCollection<TrustedDevice>(_store.For(platform));
 
-        SearchCommand = new AsyncRelayCommand(SearchAsync);
         ConnectCommand = new AsyncRelayCommand(ConnectAsync);
         CancelCommand = new RelayCommand(Cancel);
         PcDirectCommand = new AsyncRelayCommand(PairLocalPcAsync);
@@ -40,10 +39,17 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
         Status = Platform switch
         {
-            PairingPlatform.PlayStation => "Select a discovered console or type its address, then press Connect PlayStation.",
-            PairingPlatform.Xbox => "Select a discovered console or type its address, then press Connect Xbox.",
-            _ => "Pair this PC for display capture, or find a FIFINE Link Agent on the network."
+            PairingPlatform.PlayStation => "Enter the pairing code shown on the console. FIFINE finds the console on this network automatically.",
+            PairingPlatform.Xbox => "Xbox network video is not available in this build. HDMI capture is the supported path.",
+            _ => "FIFINE finds a Link Agent on this network automatically."
         };
+
+        // The console/agent is discovered in the background, so the only thing the user
+        // has to provide is the pairing code. Connect searches again if this scan misses it.
+        if (Platform != PairingPlatform.Xbox)
+        {
+            _ = SearchAsync();
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -87,9 +93,9 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
     public string CodeLabel => Platform switch
     {
-        PairingPlatform.PlayStation => "Pairing number shown on the TV",
+        PairingPlatform.PlayStation => "PAIRING CODE SHOWN ON THE TV",
         PairingPlatform.Xbox => "Pairing number (not used by Xbox)",
-        _ => "Agent pairing code"
+        _ => "AGENT PAIRING CODE"
     };
 
     public bool AcceptsCode => Platform != PairingPlatform.Xbox;
@@ -111,6 +117,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
             Raise(nameof(StageLabel));
             Raise(nameof(IsBusy));
             Raise(nameof(CanEnterCode));
+            Raise(nameof(CanConnect));
             Raise(nameof(IsConnected));
             Raise(nameof(ShowFallback));
             Raise(nameof(StatusColor));
@@ -144,7 +151,8 @@ public sealed class PairingViewModel : INotifyPropertyChanged
     public bool IsBusy => Stage is PairingStage.Searching or PairingStage.Authenticating or PairingStage.VerifyingVideo;
     public bool CanEnterCode => AcceptsCode && Stage != PairingStage.Connected;
     public bool IsConnected => Stage == PairingStage.Connected;
-    public bool ShowFallback => Stage is PairingStage.Unsupported or PairingStage.Failed or PairingStage.Interrupted;
+    public bool ShowFallback => Platform == PairingPlatform.Xbox ||
+                                Stage is PairingStage.Unsupported or PairingStage.Failed or PairingStage.Interrupted;
 
     private string _status = string.Empty;
     public string Status
@@ -169,18 +177,6 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _manualAddress = string.Empty;
-    public string ManualAddress
-    {
-        get => _manualAddress;
-        set
-        {
-            _manualAddress = (value ?? string.Empty).Trim();
-            Raise(nameof(ManualAddress));
-            Raise(nameof(CanConnect));
-        }
-    }
-
     private PairingDevice? _selectedDevice;
     public PairingDevice? SelectedDevice
     {
@@ -190,7 +186,6 @@ public sealed class PairingViewModel : INotifyPropertyChanged
             _selectedDevice = value;
             if (value is not null)
             {
-                ManualAddress = value.Address;
                 Stage = AcceptsCode ? PairingStage.AwaitingCode : PairingStage.DevicesFound;
             }
 
@@ -199,7 +194,12 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool CanConnect => !IsBusy && (Platform == PairingPlatform.Xbox || Code.Length > 0 || ManualAddress.Length > 0);
+    public bool CanConnect => !IsBusy && Platform switch
+    {
+        PairingPlatform.PlayStation => Code.Length == 8,
+        PairingPlatform.Pc => SelectedDevice is not null,
+        _ => false
+    };
 
     // ---------------------------------------------------------------- live metrics (from the real session)
 
@@ -224,7 +224,6 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
     // ---------------------------------------------------------------- commands
 
-    public ICommand SearchCommand { get; }
     public ICommand ConnectCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand PcDirectCommand { get; }
@@ -242,6 +241,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
                 ? "Asking the Remote Play engine to find consoles on this network…"
                 : "Scanning the local network for console streaming ports…";
         Devices.Clear();
+        SelectedDevice = null;
 
         if (Platform == PairingPlatform.PlayStation)
         {
@@ -263,9 +263,9 @@ public sealed class PairingViewModel : INotifyPropertyChanged
                 Stage = PairingStage.NoDevices;
                 Status = Platform switch
                 {
-                    PairingPlatform.Pc => "No FIFINE Link Agent answered. Start the agent on the gaming PC, or enter its address manually.",
-                    PairingPlatform.PlayStation => "No PlayStation answered on port 9295. Type the console's IP address, or use HDMI capture.",
-                    _ => "No Xbox answered on port 5050. Type the console's IP address, or use HDMI capture."
+                    PairingPlatform.Pc => "No FIFINE Link Agent answered. Start the agent on the gaming PC and make sure both computers are on the same network.",
+                    PairingPlatform.PlayStation => "No PlayStation answered on port 9295. Enable Remote Play and use HDMI capture if the console is still not found.",
+                    _ => "No Xbox answered on port 5050. HDMI capture is the supported path."
                 };
             }
             else
@@ -314,7 +314,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
             {
                 Stage = PairingStage.NoDevices;
                 Status = "No console answered the Remote Play engine's discovery. Check that the console is on, Remote Play is enabled, " +
-                         "and it is on the same network — or type its IP address.";
+                         "and it is on the same network, then press Connect again. HDMI capture also works.";
             }
             else
             {
@@ -332,76 +332,48 @@ public sealed class PairingViewModel : INotifyPropertyChanged
 
     private async Task ConnectAsync()
     {
-        var address = ManualAddress.Length > 0 ? ManualAddress : SelectedDevice?.Address ?? string.Empty;
-
         if (Platform == PairingPlatform.Pc)
         {
-            await PairAgentAsync(address).ConfigureAwait(true);
+            await PairAgentAsync().ConfigureAwait(true);
             return;
         }
 
         if (Platform == PairingPlatform.PlayStation)
         {
-            await ConnectPlayStationAsync(address).ConfigureAwait(true);
-            return;
-        }
-
-        if (Code.Length == 0)
-        {
-            Status = "Enter the pairing number shown on the television first.";
-            return;
-        }
-
-        if (address.Length == 0)
-        {
-            Status = "Select the console or type its IP address.";
-            return;
-        }
-
-        Stage = PairingStage.Authenticating;
-        Status = $"Contacting {address}…";
-
-        var port = Platform == PairingPlatform.PlayStation ? LanDiscovery.PlayStationPort : LanDiscovery.XboxPort;
-        var reachable = await LanDiscovery.ProbeTcpAsync(address, port, 1500).ConfigureAwait(true);
-
-        // The code is never stored: it is used for this attempt and dropped.
-        Code = string.Empty;
-
-        if (!reachable)
-        {
-            Stage = PairingStage.Failed;
-            Status = $"No console answered at {address}:{port}. Check the IP address, that the console is on and on the same network.";
+            await ConnectPlayStationAsync().ConfigureAwait(true);
             return;
         }
 
         Stage = PairingStage.Unsupported;
-        Status = $"Console reached at {address}. Xbox home streaming runs over Microsoft's xHome WebRTC service; the open clients " +
+        Status = "Xbox home streaming runs over Microsoft's xHome WebRTC service; the open clients " +
                  "for it (Greenlight, xbox-xcloud-player) are Node/Electron applications, so this build has no Xbox network video " +
                  "transport and will not claim a connection. HDMI capture is the supported path, and the button below starts it.";
     }
 
     /// <summary>The real PS5/PS4 flow: link with the displayed code, then start Remote Play.</summary>
-    private async Task ConnectPlayStationAsync(string address)
+    private async Task ConnectPlayStationAsync()
     {
         if (Code.Length == 0)
         {
-            Status = "Enter the 8-digit code shown on the console first.";
+            Status = "Enter the pairing code shown on the console first.";
             return;
         }
 
-        if (address.Length == 0)
+        if (SelectedDevice is null)
         {
-            Status = "Select the console or type its IP address.";
-            return;
+            // The sheet opened before the console was awake or Remote Play was enabled.
+            // Scan again instead of making the user type an address.
+            await SearchAsync().ConfigureAwait(true);
+            if (SelectedDevice is null)
+            {
+                return;
+            }
         }
 
-        if (_studio.PlayStation.HasRegistration && Code.Length == 0)
-        {
-            // already linked: straight to a session
-        }
+        var address = SelectedDevice.Address;
 
         Stage = PairingStage.Authenticating;
-        Status = $"Registering with the console at {address}…";
+        Status = "Registering with the console…";
 
         var code = Code;
         Code = string.Empty;
@@ -443,30 +415,33 @@ public sealed class PairingViewModel : INotifyPropertyChanged
             : _studio.PlayStation.StatusText;
     }
 
-    private async Task PairAgentAsync(string address)
+    private async Task PairAgentAsync()
     {
-        if (address.Length == 0)
+        if (SelectedDevice is null)
         {
-            Stage = PairingStage.Failed;
-            Status = "Search for an agent or type its address first.";
-            return;
+            await SearchAsync().ConfigureAwait(true);
+            if (SelectedDevice is null)
+            {
+                return;
+            }
         }
 
+        var address = SelectedDevice.Address;
         Stage = PairingStage.Authenticating;
-        Status = $"Contacting FIFINE Link Agent at {address}…";
+        Status = "Contacting FIFINE Link Agent…";
 
-        var port = SelectedDevice?.Port ?? 47810;
+        var port = SelectedDevice.Port;
         var reachable = await LanDiscovery.ProbeTcpAsync(address, port, 1500).ConfigureAwait(true);
 
         if (!reachable)
         {
             Stage = PairingStage.Failed;
-            Status = $"Nothing answered at {address}:{port}. The Link Agent is not running there, or the port is blocked.";
+            Status = "No FIFINE Link Agent answered. Start it on the other PC and try again.";
             return;
         }
 
         Stage = PairingStage.Unsupported;
-        Status = $"A host answered at {address}:{port}, but the FIFINE Link Agent video transport is not part of this build, " +
+        Status = "A host answered, but the FIFINE Link Agent video transport is not part of this build, " +
                  "so no frames can be received yet. Pairing will not report CONNECTED without real frames. " +
                  "Use 'Capture this PC' to capture the local display now.";
     }
@@ -517,7 +492,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         {
             Stage = PairingStage.Connected;
             Status = $"Connected · receiving live {PlatformName} video.";
-            _store.Remember(Platform, SelectedDevice?.Name ?? PlatformName, SelectedDevice?.Address ?? ManualAddress, "HDMI capture card");
+            _store.Remember(Platform, SelectedDevice?.Name ?? PlatformName, SelectedDevice?.Address ?? "HDMI capture card", "HDMI capture card");
             TrustedDevices.Clear();
             foreach (var device in _store.For(Platform))
             {
@@ -537,7 +512,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
     private void Cancel()
     {
         _searchCts?.Cancel();
-        if (Stage is PairingStage.Searching or PairingStage.Authenticating or PairingStage.VerifyingVideo)
+        if (Stage is PairingStage.Authenticating or PairingStage.VerifyingVideo)
         {
             Stage = PairingStage.Idle;
             Status = "Cancelled.";

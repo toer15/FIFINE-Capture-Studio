@@ -62,7 +62,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -97,25 +96,6 @@
                 <TextBlock Text="{Binding Instructions}" Style="{StaticResource Body}" TextWrapping="Wrap" FontSize="12.3" LineHeight="21" />
             </Border>
 
-            <!-- discovery + manual address -->
-            <Grid Grid.Row="2" Margin="0,14,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                    <TextBlock Text="CONSOLE / AGENT ADDRESS" Style="{StaticResource PairLabel}" />
-                    <TextBox Style="{StaticResource DarkText}" Height="34" Text="{Binding ManualAddress, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Type the IP address when discovery cannot find the device." />
-                </StackPanel>
-                <Button Grid.Column="1" Style="{StaticResource GhostButton}" Height="34" Width="112" Margin="10,17,0,0"
-                        Content="Search" Command="{Binding SearchCommand}" IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
-                <Button Grid.Column="2" Style="{StaticResource AccentButton}" Height="34" Width="176" Margin="8,17,0,0"
-                        Content="{Binding ConnectLabel}" Command="{Binding ConnectCommand}"
-                        IsEnabled="{Binding CanConnect}" />
-            </Grid>
-
             <!-- discovered devices -->
             <StackPanel Grid.Row="3" Margin="0,12,0,0">
                 <TextBlock Text="DISCOVERED DEVICES" Style="{StaticResource PairLabel}" />
@@ -135,34 +115,38 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-                <TextBlock Text="Nothing found yet. Discovery only proves a host exists — it does not authenticate anything."
+                <TextBlock Text="FIFINE searches automatically when this sheet opens and again when you press Connect."
                            Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" Margin="0,2,0,0" />
             </StackPanel>
 
             <!-- one-time code -->
-            <StackPanel Grid.Row="4" Margin="0,14,0,0" Visibility="{Binding AcceptsCode, Converter={StaticResource BoolToVis}}">
+            <StackPanel Grid.Row="2" Margin="0,14,0,0" Visibility="{Binding AcceptsCode, Converter={StaticResource BoolToVis}}">
                 <TextBlock Text="{Binding CodeLabel}" Style="{StaticResource PairLabel}" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <TextBox Style="{StaticResource DarkText}" Height="44" Width="220" HorizontalAlignment="Left"
                              FontSize="21" FontFamily="Consolas" Text="{Binding Code, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             IsEnabled="{Binding CanEnterCode}" MaxLength="12" />
-                    <TextBlock Grid.Column="1" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0,0,0"
-                               Text="Any length the console shows. The code is used for this attempt only — it is never written to disk." />
+                             IsEnabled="{Binding CanEnterCode}" MaxLength="8" />
+                    <Button Grid.Column="1" Style="{StaticResource AccentButton}" Height="44" Width="176" Margin="10,0,0,0"
+                            Content="{Binding ConnectLabel}" Command="{Binding ConnectCommand}"
+                            IsEnabled="{Binding CanConnect}" />
+                    <TextBlock Grid.Column="2" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"
+                               Text="The only thing you enter. FIFINE finds the console on this network and uses the code for this attempt only." />
                 </Grid>
             </StackPanel>
 
             <!-- status -->
-            <Border Grid.Row="5" Background="#FF0E1420" CornerRadius="10" BorderBrush="#FF1E2740" BorderThickness="1"
+            <Border Grid.Row="4" Background="#FF0E1420" CornerRadius="10" BorderBrush="#FF1E2740" BorderThickness="1"
                     Padding="12,10" Margin="0,14,0,0">
                 <TextBlock Text="{Binding Status}" Style="{StaticResource Caption}" TextWrapping="Wrap" Foreground="#FFC9D3E4" />
             </Border>
 
             <!-- live metrics (only after real frames) -->
-            <Border Grid.Row="6" Background="#FF0F2A22" CornerRadius="11" BorderBrush="#FF1F6B52" BorderThickness="1"
+            <Border Grid.Row="5" Background="#FF0F2A22" CornerRadius="11" BorderBrush="#FF1F6B52" BorderThickness="1"
                     Padding="14,12" Margin="0,12,0,0"
                     Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
@@ -199,7 +183,7 @@
             </Border>
 
             <!-- fallback + trusted devices -->
-            <Grid Grid.Row="7" Margin="0,12,0,0">
+            <Grid Grid.Row="6" Margin="0,12,0,0">
                 <StackPanel>
                     <StackPanel Visibility="{Binding ShowFallback, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="SUPPORTED PATH" Style="{StaticResource PairLabel}" />
@@ -226,9 +210,7 @@
                             <DataTemplate>
                                 <Grid Height="24">
                                     <TextBlock Style="{StaticResource CaptionTiny}" VerticalAlignment="Center"
-                                               Text="{Binding Name}" />
-                                    <TextBlock Style="{StaticResource CaptionTiny}" Foreground="#FF7C879B" Margin="140,0,90,0"
-                                               VerticalAlignment="Center" Text="{Binding Address}" />
+                                               Text="{Binding Name}" Margin="0,0,90,0" />
                                     <Button Style="{StaticResource GhostButton}" Height="22" Width="76" HorizontalAlignment="Right"
                                             Content="Forget" FontSize="10"
                                             Command="{Binding DataContext.ForgetCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
@@ -241,7 +223,7 @@
             </Grid>
 
             <!-- footer -->
-            <Grid Grid.Row="8" Margin="0,14,0,0">
+            <Grid Grid.Row="7" Margin="0,14,0,0">
                 <TextBlock Style="{StaticResource CaptionTiny}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="480"
                            Text="FIFINE never sends pairing codes to a server, never stores console credentials, and never claims a connection before video frames arrive." />
                 <Button Style="{StaticResource GhostButton}" Height="32" Width="110" HorizontalAlignment="Right"

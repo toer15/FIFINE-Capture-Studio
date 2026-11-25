@@ -197,7 +197,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         if (hosts.Count == 0)
         {
             SetState(ConsoleStreamState.Idle,
-                "No PlayStation console answered. Make sure Remote Play is enabled and the console is on the same network, or type its address.");
+                "No PlayStation console answered. Make sure Remote Play is enabled and the console is on the same network.");
         }
         else
         {
@@ -212,7 +212,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     {
         if (string.IsNullOrWhiteSpace(address))
         {
-            return new NixaniRegistration(false, "Enter the console address or discover it first.", string.Empty,
+            return new NixaniRegistration(false, "No console has been discovered yet. Wait for the scan or press Connect again.", string.Empty,
                 Array.Empty<byte>(), 0, Array.Empty<byte>(), Array.Empty<byte>(), 0, 0);
         }
 
@@ -345,7 +345,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
 
         if (string.IsNullOrWhiteSpace(ps.ConsoleAddress))
         {
-            SetState(ConsoleStreamState.Failed, "No console address is stored. Discover or enter the console again.", "No address");
+            SetState(ConsoleStreamState.Failed, "No console is stored yet. Pair with the code shown on the console.", "No console");
             return false;
         }
 
