@@ -74,7 +74,9 @@ public sealed record FpsOverlaySnapshot(
     string Generated,
     string Presented,
     string Input,
-    string Qualifier);
+    string Qualifier,
+    string Multiplier,
+    bool FrameGenVisible);
 
 /// <summary>Latest visual-cadence estimate. Confidence is always supplied with the number.</summary>
 public sealed record CadenceReading(

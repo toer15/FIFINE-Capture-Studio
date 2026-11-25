@@ -115,8 +115,12 @@
                                     Content="{Binding PairingButtonLabel}" />
 
                             <TextBlock Text="Connection guide" Style="{StaticResource SourceLabel}" />
-                            <TextBlock Text="{Binding PlatformConnectionGuide}" Style="{StaticResource Body}" TextWrapping="Wrap"
-                                       FontSize="12.5" LineHeight="26" Margin="0,0,0,16" />
+                            <TextBlock Text="{Binding PlatformSetupHeading}" FontSize="10.5" FontWeight="Bold"
+                                       Foreground="#FF9AB7D9" Margin="0,2,0,4" />
+                            <TextBlock Text="{Binding PlatformSetupSteps}" Style="{StaticResource Body}" TextWrapping="Wrap"
+                                       FontSize="12" LineHeight="21" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding PlatformConnectionGuide}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap"
+                                       LineHeight="18" Margin="0,0,0,16" />
 
                             <StackPanel Orientation="Horizontal"
                                         Visibility="{Binding IsPlatformPC, Converter={StaticResource InverseBoolToVis}}">
@@ -392,8 +396,8 @@
                                 <TextBlock Text="{Binding CaptureStateText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
                             </Grid>
                             <Grid Margin="0,0,0,7">
-                                <TextBlock Text="Measured FPS" Style="{StaticResource Caption}" />
-                                <TextBlock Text="{Binding FpsText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                <TextBlock Text="Game FPS" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding LiveFpsLabel}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
                             </Grid>
                             <Grid>
                                 <TextBlock Text="Latency" Style="{StaticResource Caption}" />

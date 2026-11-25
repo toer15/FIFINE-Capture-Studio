@@ -206,15 +206,38 @@
                         </Button>
                     </StackPanel>
 
-                    <Border Background="#F0070A12" CornerRadius="14"
+                    <Border Background="#FF000000" CornerRadius="14"
                             Visibility="{Binding ShowNoSignal, Converter={StaticResource BoolToVis}}">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="480">
-                            <TextBlock Text="No capture signal" Style="{StaticResource H2}" HorizontalAlignment="Center" />
-                            <TextBlock Text="{Binding CaptureFormatSummary}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap"
-                                       TextAlignment="Center" Margin="0,10,0,0" />
-                            <Button Style="{StaticResource AccentButton}" Height="38" Width="160" Content="Start capture"
-                                    Command="{Binding StartCaptureCommand}" Margin="0,16,0,0" />
-                        </StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="560" Margin="28,24">
+                                <Border Background="#FF111827" BorderBrush="#FF4E5E82" BorderThickness="1"
+                                        CornerRadius="7" Padding="9,3" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding PlatformShortLabel}" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FF8FE9FF" />
+                                </Border>
+                                <TextBlock Text="{Binding NoSignalTitle}" Style="{StaticResource H2}" HorizontalAlignment="Center"
+                                           Margin="0,10,0,0" />
+                                <TextBlock Text="{Binding CaptureFormatSummary}" Style="{StaticResource CaptionTiny}" TextWrapping="Wrap"
+                                           TextAlignment="Center" Margin="0,6,0,0" />
+                                <Border Background="#FF0B111D" BorderBrush="#FF253048" BorderThickness="1"
+                                        CornerRadius="10" Padding="14,12" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding PlatformSetupHeading}" FontSize="10.5" FontWeight="Bold"
+                                                   Foreground="#FF9AB7D9" />
+                                        <TextBlock Text="{Binding PlatformSetupSteps}" Style="{StaticResource Body}"
+                                                   TextWrapping="Wrap" FontSize="12" LineHeight="21" Margin="0,7,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Text="{Binding PlatformConnectionGuide}" Style="{StaticResource CaptionTiny}"
+                                           TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,0">
+                                    <Button Style="{StaticResource GhostButton}" Height="38" Content="{Binding PlatformSetupButtonLabel}"
+                                            Command="{Binding NavigateCommand}" CommandParameter="sources" />
+                                    <Button Style="{StaticResource AccentButton}" Height="38" Width="160" Content="Start capture"
+                                            Command="{Binding StartCaptureCommand}" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
 
                     <Border VerticalAlignment="Bottom" Height="44" Background="#D9080B14" CornerRadius="0,0,14,14">
@@ -261,8 +284,8 @@
                                 </TextBlock>
                             </Grid>
                             <Grid Margin="0,0,0,7">
-                                <TextBlock Text="Measured FPS" Style="{StaticResource InfoLabel}" />
-                                <TextBlock Text="{Binding FpsText}" Style="{StaticResource InfoValue}" />
+                                <TextBlock Text="Game FPS" Style="{StaticResource InfoLabel}" />
+                                <TextBlock Text="{Binding LiveFpsLabel}" Style="{StaticResource InfoValue}" />
                             </Grid>
                             <Grid Margin="0,0,0,7">
                                 <TextBlock Text="Frame time / jitter" Style="{StaticResource InfoLabel}" />

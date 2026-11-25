@@ -156,7 +156,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ResolutionLabel}" Style="{StaticResource TitlePillText}" />
                             <TextBlock Text="·" Style="{StaticResource TitlePillText}" Margin="7,0" Foreground="#FF5D6A83" />
-                            <TextBlock Text="{Binding FpsChipLabel}" Style="{StaticResource TitlePillText}" />
+                            <TextBlock Text="{Binding LiveFpsLabel}" Style="{StaticResource TitlePillText}" />
                         </StackPanel>
                     </Border>
 

@@ -131,11 +131,23 @@ public sealed partial class StudioViewModel
     {
         get
         {
-            if (!FrameGenerationActive) return "OFF";
+            if (!FrameGenerationActive) return "—";
             var total = _services.FrameGeneration.SourceFps + _services.FrameGeneration.GeneratedFps;
             return total > 0 ? $"{total:0}" : "—";
         }
     }
+
+    /// <summary>The only multiplier the interpolator implements; settings normalise it to 2.</summary>
+    public string FrameGenMultiplierDisplay => $"{Math.Max(2, Config.FrameGeneration.Multiplier)}×";
+
+    public bool FrameGenBadgeVisible => FrameGenerationEnabled;
+
+    public string FrameGenFpsDisplay => FrameGenerationActive ? FrameGenOutputDisplay : "—";
+
+    /// <summary>Game FPS followed by the generated output only while frame generation is enabled.</summary>
+    public string LiveFpsLabel => FrameGenerationEnabled
+        ? $"{GameFpsDisplay} FPS · {FrameGenMultiplierDisplay} {FrameGenFpsDisplay}"
+        : $"{GameFpsDisplay} FPS";
 
     public string GeneratedFpsDisplay => FrameGenerationActive && _services.FrameGeneration.GeneratedFps > 0
         ? $"{_services.FrameGeneration.GeneratedFps:0}"
@@ -354,7 +366,9 @@ public sealed partial class StudioViewModel
         GeneratedFpsDisplay,
         PresentedFpsDisplay,
         InputFpsDisplay,
-        GameFpsQualifier);
+        GameFpsQualifier,
+        FrameGenMultiplierDisplay,
+        FrameGenBadgeVisible);
 
     public void RaiseFpsOverlay()
     {
@@ -371,6 +385,10 @@ public sealed partial class StudioViewModel
         Raise(nameof(GameFpsDisplay));
         Raise(nameof(GameFpsQualifier));
         Raise(nameof(FrameGenOutputDisplay));
+        Raise(nameof(FrameGenMultiplierDisplay));
+        Raise(nameof(FrameGenBadgeVisible));
+        Raise(nameof(FrameGenFpsDisplay));
+        Raise(nameof(LiveFpsLabel));
         Raise(nameof(GeneratedFpsDisplay));
         Raise(nameof(PresentedFpsDisplay));
         Raise(nameof(InputFpsDisplay));
@@ -393,6 +411,9 @@ public sealed partial class StudioViewModel
         Raise(nameof(PresentMonInstalled));
         Raise(nameof(PresentMonActionText));
         Raise(nameof(PresentMonStatusText));
+        Raise(nameof(FpsChipLabel));
+        Raise(nameof(FpsChipLive));
+        Raise(nameof(OutputFpsLabel));
         _nativePresenter?.UpdateOverlay(BuildFpsOverlaySnapshot());
     }
 }

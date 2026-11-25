@@ -637,16 +637,8 @@ public sealed partial class StudioViewModel : ObservableObject
         ? $"{Config.Recording.Width}×{Config.Recording.Height}"
         : InputResolutionLabel;
 
-    /// <summary>Live FPS shown next to Output in the app status bar (not over the game picture).</summary>
-    public string OutputFpsLabel
-    {
-        get
-        {
-            var measured = _services.Session.MeasuredFps;
-            var fps = measured > 0 ? measured : Config.Capture.Fps;
-            return measured > 0 ? $"{fps:0.#} FPS" : $"{fps} FPS (set)";
-        }
-    }
+    /// <summary>Live game FPS, with the frame-generation multiplier only while it is enabled.</summary>
+    public string OutputFpsLabel => LiveFpsLabel;
     public string FpsChipLabel => $"{Config.Capture.Fps} FPS";
     public string ResolutionLabel => $"{Config.Capture.ResolutionWidth} × {Config.Capture.ResolutionHeight}";
     public string PlatformChipLabel => Config.Capture.Platform switch
@@ -686,6 +678,53 @@ public sealed partial class StudioViewModel : ObservableObject
             "PC graphics output  →  capture card HDMI IN (external capture)\n" +
             "or capture the PC display directly with desktop / window capture\n" +
             "Controller stays connected to the PC"
+    };
+
+    public string PlatformShortLabel => Config.Capture.Platform switch
+    {
+        PlatformKind.PS5 => "PS5",
+        PlatformKind.Xbox => "XBOX",
+        _ => "PC"
+    };
+
+    public string NoSignalTitle => Config.Capture.Platform switch
+    {
+        PlatformKind.PS5 => "Connect PlayStation 5",
+        PlatformKind.Xbox => "Connect Xbox",
+        _ => "Connect PC"
+    };
+
+    public string PlatformSetupHeading => Config.Capture.Platform switch
+    {
+        PlatformKind.PS5 => "ON PLAYSTATION 5",
+        PlatformKind.Xbox => "ON XBOX",
+        _ => "ON PC"
+    };
+
+    public string PlatformSetupSteps => Config.Capture.Platform switch
+    {
+        PlatformKind.PS5 =>
+            "1. Settings → System → Remote Play → Enable Remote Play.\n" +
+            "2. Settings → Screen and Video → Video Output → Enable HDCP: Off for HDMI capture.\n" +
+            "3. Connect HDMI OUT to the capture card, or register this console for Remote Play.\n" +
+            "4. Keep the console awake and on the same network as this PC.",
+        PlatformKind.Xbox =>
+            "1. Settings → General → TV & display options → Video fidelity & overscan → Auto-detect.\n" +
+            "2. Connect Xbox HDMI OUT to the capture card's HDMI IN.\n" +
+            "3. Choose 1080p/60 or 1440p/120 in the console display settings.\n" +
+            "4. Xbox network video is not used here; HDMI capture is the supported path.",
+        _ =>
+            "1. Start the game in borderless windowed mode.\n" +
+            "2. Choose Desktop display or Game window as the capture method.\n" +
+            "3. Or connect your GPU HDMI output to a capture card.\n" +
+            "4. Keep Low Latency Mode on for the smallest preview delay."
+    };
+
+    public string PlatformSetupButtonLabel => Config.Capture.Platform switch
+    {
+        PlatformKind.PS5 => "Show PS5 setup",
+        PlatformKind.Xbox => "Show Xbox setup",
+        _ => "Show PC setup"
     };
 
     public string PlatformHdcpNote => Config.Capture.Platform == PlatformKind.PC
@@ -746,9 +785,7 @@ public sealed partial class StudioViewModel : ObservableObject
         ? $"{_services.Session.MeasuredFps:0.#}"
         : "—";
 
-    public string FpsChipLive => _services.Session.MeasuredFps > 0
-        ? $"FPS {_services.Session.MeasuredFps:0}"
-        : $"FPS {Config.Capture.Fps}";
+    public string FpsChipLive => LiveFpsLabel;
 
     public string LatencyText => _services.Session.PresentLatencyMs > 0
         ? $"{_services.Session.PresentLatencyMs:0.0} ms"
@@ -1299,6 +1336,11 @@ public sealed partial class StudioViewModel : ObservableObject
         RaiseCaptureState();
         Raise(nameof(PlatformTitle));
         Raise(nameof(PlatformConnectionGuide));
+        Raise(nameof(PlatformShortLabel));
+        Raise(nameof(NoSignalTitle));
+        Raise(nameof(PlatformSetupHeading));
+        Raise(nameof(PlatformSetupSteps));
+        Raise(nameof(PlatformSetupButtonLabel));
         Raise(nameof(PlatformHdcpNote));
         Raise(nameof(SelectedSourceKind));
         Raise(nameof(DeviceConnected));
@@ -2207,6 +2249,12 @@ public sealed partial class StudioViewModel : ObservableObject
         Raise(nameof(FpsChipLabel));
         Raise(nameof(PlatformChipLabel));
         Raise(nameof(PlatformTitle));
+        Raise(nameof(PlatformConnectionGuide));
+        Raise(nameof(PlatformShortLabel));
+        Raise(nameof(NoSignalTitle));
+        Raise(nameof(PlatformSetupHeading));
+        Raise(nameof(PlatformSetupSteps));
+        Raise(nameof(PlatformSetupButtonLabel));
         Raise(nameof(IsPlatformPS5));
         Raise(nameof(IsPlatformXbox));
         Raise(nameof(IsPlatformPC));

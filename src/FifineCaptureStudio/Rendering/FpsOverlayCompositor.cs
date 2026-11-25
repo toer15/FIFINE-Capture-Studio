@@ -104,12 +104,19 @@ public static class FpsOverlayCompositor
         var padding = 5 * scale;
         var lineGap = 3 * scale;
 
-        var lines = new[]
-        {
-            $"GAME {snapshot.Game}   FRAME GEN {snapshot.FrameGenTotal}",
-            $"GEN {snapshot.Generated}   PRES {snapshot.Presented}   IN {snapshot.Input}",
-            snapshot.Qualifier
-        };
+        var lines = snapshot.FrameGenVisible
+            ? new[]
+            {
+                $"GAME {snapshot.Game} {snapshot.Multiplier}   FRAME GEN {snapshot.FrameGenTotal}",
+                $"GEN {snapshot.Generated}   PRES {snapshot.Presented}   IN {snapshot.Input}",
+                snapshot.Qualifier
+            }
+            : new[]
+            {
+                $"GAME {snapshot.Game}",
+                $"PRES {snapshot.Presented}   IN {snapshot.Input}",
+                snapshot.Qualifier
+            };
         var columns = lines.Max(line => line.Length);
         var boxWidth = Math.Min(frameWidth, (columns * charWidth) + (padding * 2));
         var boxHeight = Math.Min(frameHeight, (lines.Length * charHeight) + ((lines.Length - 1) * lineGap) + (padding * 2));
@@ -180,6 +187,7 @@ public static class FpsOverlayCompositor
                 '·' => '.',
                 '—' => '-',
                 '≈' => '~',
+                '×' => 'X',
                 >= '0' and <= '9' => raw,
                 >= 'A' and <= 'Z' => raw,
                 _ => Glyphs.ContainsKey(raw) ? raw : ' '

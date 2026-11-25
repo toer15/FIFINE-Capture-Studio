@@ -528,6 +528,13 @@ public sealed partial class StudioViewModel
         Raise(nameof(FrameGenerationBypassLabel));
         Raise(nameof(FrameGenerationBodyText));
         Raise(nameof(FrameGenerationDisplayText));
+        Raise(nameof(FpsChipLabel));
+        Raise(nameof(FpsChipLive));
+        Raise(nameof(OutputFpsLabel));
+        Raise(nameof(FrameGenBadgeVisible));
+        Raise(nameof(FrameGenMultiplierDisplay));
+        Raise(nameof(FrameGenFpsDisplay));
+        Raise(nameof(LiveFpsLabel));
     }
 
     private void RaiseAllFrameGeneration()
