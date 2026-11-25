@@ -157,6 +157,44 @@ public class PsnAccountProviderTests
     }
 
     [Fact]
+    public async Task Signing_in_with_a_different_account_clears_stale_console_registration()
+    {
+        var settings = AccountTestSupport.NewSettings(out var root);
+        try
+        {
+            var ps = settings.Current.PlayStation;
+            ps.AccountId = "old-account";
+            ps.RegistKey = "stale-regist-key";
+            ps.RpKey = "stale-rp-key";
+            ps.RegistrationAccountId = "old-account";
+            settings.Save();
+
+            using var provider = new PsnAccountProvider(settings);
+            await provider.SignInAsync(
+                new FakeAccountInteraction
+                {
+                    PsnResult = new PsnAuthResult(
+                        "new-account",
+                        "NewOnlineId",
+                        "access-token",
+                        "refresh-token",
+                        DateTimeOffset.UtcNow.AddHours(1))
+                },
+                CancellationToken.None);
+
+            Assert.Equal("new-account", ps.AccountId);
+            Assert.Equal(string.Empty, ps.RegistKey);
+            Assert.Equal(string.Empty, ps.RpKey);
+            Assert.Equal(string.Empty, ps.RegistrationAccountId);
+            Assert.False(ps.HasRegistration);
+        }
+        finally
+        {
+            AccountTestSupport.Cleanup(root);
+        }
+    }
+
+    [Fact]
     public async Task Cancelling_sign_in_is_a_cancel_not_a_connection_failure()
     {
         var settings = AccountTestSupport.NewSettings(out var root);
@@ -328,6 +366,9 @@ public class PsnAccountProviderTests
             Assert.Equal(string.Empty, settings.Current.PlayStation.AccountId);
             Assert.Equal(string.Empty, settings.Current.PlayStation.OnlineId);
             Assert.Equal(string.Empty, settings.Current.PlayStation.RefreshTokenProtected);
+            Assert.Equal(string.Empty, settings.Current.PlayStation.RegistKey);
+            Assert.Equal(string.Empty, settings.Current.PlayStation.RpKey);
+            Assert.False(settings.Current.PlayStation.HasRegistration);
             Assert.Equal("XboxName", settings.Current.Xbox.Gamertag);
             Assert.Equal("xuid", settings.Current.Xbox.Xuid);
         }

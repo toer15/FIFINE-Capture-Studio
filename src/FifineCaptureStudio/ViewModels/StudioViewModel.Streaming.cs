@@ -115,7 +115,7 @@ public sealed partial class StudioViewModel
         await _accounts.SignInAsync(AccountPlatform.PlayStation, _accountInteraction);
         Raise(nameof(PlayStationAccountId));
         Raise(nameof(PlayStationAccount));
-        Raise(nameof(ConsoleStatusText));
+        RaiseConsoleState();
         return PlayStationStreamService.IsValidAccountId(PlayStationAccountId);
     }
 
@@ -125,7 +125,7 @@ public sealed partial class StudioViewModel
         _accounts.SignOut(AccountPlatform.PlayStation);
         Raise(nameof(PlayStationAccountId));
         Raise(nameof(PlayStationAccount));
-        Raise(nameof(ConsoleStatusText));
+        RaiseConsoleState();
     });
 
     public string XboxClientId

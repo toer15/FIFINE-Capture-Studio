@@ -61,11 +61,13 @@ is not presented as a signed-in account. Without an account ID the PS5 rejects t
 After sign-in, the pairing sheet only asks for the 8-digit code shown on the TV.
 
 If the PS5 reports `0x80108b12`, Remote Play is disabled for the PSN user that is active on the
-console (PS5 10.00+ has a per-user Remote Play setting), or the app is not using that user's PSN
-account. Sign in here with the same PSN account that is active on the console, turn on
-**Settings → System → Remote Play** for that user, then pair again with a fresh code. FIFINE now
-requires a real, non-zero PSN account ID before it starts a PS5 session and reports this rejection
-instead of the generic "Session timeout".
+console (PS5 10.00+ has a per-user Remote Play setting), or the saved console keys were issued for
+a different PSN account. Sign in here with the same PSN account that is active on the console, turn
+on **Settings → System → Remote Play** for that user, then use **Forget console registration** and
+pair again with a fresh code. Registrations are now tied to the PSN account: changing accounts or
+signing out drops the old keys instead of letting the engine start a session that the console will
+reject. FIFINE also requires a real, non-zero PSN account ID before it starts a PS5 session and
+reports this rejection instead of the generic "Session timeout".
 
 The Xbox row uses Microsoft's device-code flow, then Xbox Live user/XSTS authentication and the
 profile service to show the actual Gamertag. Xbox Live requires a Microsoft Entra app registration

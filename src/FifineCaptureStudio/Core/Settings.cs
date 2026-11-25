@@ -147,8 +147,28 @@ public sealed class PlayStationSettings
     public string RegistKey { get; set; } = string.Empty;
     public string RpKey { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The PSN account that owned the link code when these keys were created. Older builds did
+    /// not record this; such keys must be treated as stale and paired again after Sony sign-in.
+    /// </summary>
+    public string RegistrationAccountId { get; set; } = string.Empty;
+
     [JsonIgnore]
-    public bool HasRegistration => !string.IsNullOrEmpty(RegistKey) && !string.IsNullOrEmpty(RpKey);
+    public bool HasRegistration =>
+        !string.IsNullOrEmpty(RegistKey) &&
+        !string.IsNullOrEmpty(RpKey) &&
+        (!IsPs5 || (!string.IsNullOrEmpty(RegistrationAccountId) &&
+                    string.Equals(RegistrationAccountId, AccountId, StringComparison.Ordinal)));
+
+    /// <summary>Drops console keys that belong to a different PSN account.</summary>
+    public void ClearRegistration()
+    {
+        RegistKey = string.Empty;
+        RpKey = string.Empty;
+        RegistrationAccountId = string.Empty;
+        HostId = string.Empty;
+        ConsolePin = 0;
+    }
 
     [JsonIgnore]
     public int Width => Resolution >= 1080 ? 1920 : Resolution >= 720 ? 1280 : 960;
@@ -425,6 +445,7 @@ public sealed class AppSettings
         s.PlayStation.EnginePath = (s.PlayStation.EnginePath ?? string.Empty).Trim();
         s.PlayStation.AccountId = (s.PlayStation.AccountId ?? string.Empty).Trim();
         s.PlayStation.OnlineId = (s.PlayStation.OnlineId ?? string.Empty).Trim();
+        s.PlayStation.RegistrationAccountId = (s.PlayStation.RegistrationAccountId ?? string.Empty).Trim();
         s.Xbox.ClientId = (s.Xbox.ClientId ?? string.Empty).Trim();
 
         s.Updates.CheckIntervalMinutes = Math.Clamp(s.Updates.CheckIntervalMinutes, 30, 10080);

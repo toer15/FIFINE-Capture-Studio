@@ -168,6 +168,31 @@ public sealed class NixaniEngineIntegrationTests
     }
 
     [Fact]
+    public void Console_registration_is_bound_to_the_psn_account()
+    {
+        var ps = new PlayStationSettings
+        {
+            IsPs5 = true,
+            AccountId = "account-a",
+            RegistrationAccountId = "account-a",
+            RegistKey = "regist-key",
+            RpKey = "rp-key"
+        };
+
+        Assert.True(ps.HasRegistration);
+
+        ps.AccountId = "account-b";
+        Assert.False(ps.HasRegistration);
+
+        ps.IsPs5 = false;
+        Assert.True(ps.HasRegistration);
+
+        ps.ClearRegistration();
+        Assert.False(ps.HasRegistration);
+        Assert.Equal(string.Empty, ps.RegistrationAccountId);
+    }
+
+    [Fact]
     public void Console_settings_migrate_and_are_normalised()
     {
         var settings = new AppSettings

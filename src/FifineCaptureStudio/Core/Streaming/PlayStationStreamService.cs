@@ -314,6 +314,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
 
         ps.RegistKey = SecretStore.ProtectBytes(result.RegistKey);
         ps.RpKey = SecretStore.ProtectBytes(result.RpKey);
+        ps.RegistrationAccountId = ps.AccountId;
         ps.ConsoleName = string.IsNullOrWhiteSpace(result.Nickname) ? ps.ConsoleName : result.Nickname;
         ps.HostId = ps.ConsoleAddress;
         _settings.Save();
@@ -376,7 +377,8 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         get
         {
             var ps = _settings.Current.PlayStation;
-            return SecretStore.UnprotectBytes(ps.RegistKey) is { Length: 16 }
+            return ps.HasRegistration
+                   && SecretStore.UnprotectBytes(ps.RegistKey) is { Length: 16 }
                    && SecretStore.UnprotectBytes(ps.RpKey) is { Length: 16 };
         }
     }
@@ -384,13 +386,11 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     public void Forget()
     {
         var ps = _settings.Current.PlayStation;
-        ps.RegistKey = string.Empty;
-        ps.RpKey = string.Empty;
+        ps.ClearRegistration();
         ps.ConsoleName = string.Empty;
         ps.ConsoleAddress = string.Empty;
-        ps.HostId = string.Empty;
         _settings.Save();
-        SetState(ConsoleStreamState.Idle, "Console registration removed.");
+        SetState(ConsoleStreamState.Idle, "Console registration removed. Pair again with a fresh code from the console.");
     }
 
     // ------------------------------------------------------------------ session
@@ -405,11 +405,12 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         var ps = _settings.Current.PlayStation;
         var registKey = SecretStore.UnprotectBytes(ps.RegistKey);
         var rpKey = SecretStore.UnprotectBytes(ps.RpKey);
-        if (registKey is not { Length: 16 } || rpKey is not { Length: 16 })
+        if (registKey is not { Length: 16 } || rpKey is not { Length: 16 } || !ps.HasRegistration)
         {
-            SetState(ConsoleStreamState.Failed,
-                "This console is not registered yet. Pair it with the code shown in Settings → System → Remote Play → Link Device.",
-                "Console not registered");
+            var message = ps.IsPs5 && !string.IsNullOrEmpty(ps.RegistKey)
+                ? "The saved console registration belongs to a different PSN account. Pair again with a fresh code so the PS5 issues keys for this account."
+                : "This console is not registered yet. Pair it with the code shown in Settings → System → Remote Play → Link Device.";
+            SetState(ConsoleStreamState.Failed, message, "Console not registered for this account");
             return false;
         }
 

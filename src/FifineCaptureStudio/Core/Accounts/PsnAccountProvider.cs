@@ -168,6 +168,7 @@ public sealed class PsnAccountProvider : IDisposable
         ps.AccessTokenProtected = string.Empty;
         ps.RefreshTokenProtected = string.Empty;
         ps.AccessTokenExpiresUtc = default;
+        ps.ClearRegistration();
         _settings.Save();
         Session.SetSignedOut("Signed out of PlayStation Network.");
     }
@@ -177,6 +178,14 @@ public sealed class PsnAccountProvider : IDisposable
     private bool Persist(PsnAuthResult result)
     {
         var ps = _settings.Current.PlayStation;
+        if (!string.Equals(ps.AccountId, result.AccountId, StringComparison.Ordinal))
+        {
+            // Console registration keys are issued for the PSN account that requested them.
+            // Keeping keys from a previous/manual account makes the PS5 reject the session with
+            // 0x80108b12 even though the new account is signed in.
+            ps.ClearRegistration();
+        }
+
         ps.AccountId = result.AccountId;
         ps.OnlineId = result.OnlineId;
         ps.AccessTokenProtected = SecretProtector.Protect(result.AccessToken);
@@ -197,6 +206,7 @@ public sealed class PsnAccountProvider : IDisposable
         {
             ps.AccountId = string.Empty;
             ps.OnlineId = string.Empty;
+            ps.ClearRegistration();
         }
 
         _settings.Save();
