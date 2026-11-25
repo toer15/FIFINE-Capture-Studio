@@ -749,7 +749,7 @@ public sealed partial class StudioViewModel : ObservableObject
     }
 
     public bool HasPreviewFrame => _previewImage is not null && _services.Session.HasSignal;
-    public bool ShowNoSignal => !_services.Session.HasSignal;
+    public bool ShowNoSignal => !_services.Session.IsPreviewing || !_services.Session.HasSignal;
 
     public string CaptureStateText => _services.Session.StatusLine;
     public bool IsPreviewing => _services.Session.IsPreviewing;
@@ -1333,6 +1333,7 @@ public sealed partial class StudioViewModel : ObservableObject
         }
 
         _services.Settings.Save();
+        _services.Session.ResetSignal();
         RaiseCaptureState();
         Raise(nameof(PlatformTitle));
         Raise(nameof(PlatformConnectionGuide));

@@ -100,7 +100,7 @@
                 <RowDefinition Height="12" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="12" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="234" />
             </Grid.RowDefinitions>
 
             <!-- Platform tabs -->
@@ -191,9 +191,9 @@
                     </StackPanel>
 
                     <!-- no signal -->
-                    <Border Background="#F0070A12" CornerRadius="14"
+                    <Border Background="#FF000000" CornerRadius="14"
                             Visibility="{Binding ShowNoSignal, Converter={StaticResource BoolToVis}}">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="520" Margin="0,0,0,46">
                             <Border Width="52" Height="52" CornerRadius="16" Background="#FF161F31" BorderBrush="#FF2A3A55" BorderThickness="1" HorizontalAlignment="Center">
                                 <Path Data="{StaticResource IconCamera}" Stroke="#FF8F84FF" StrokeThickness="1.5"
                                       Width="22" Height="22" Stretch="Uniform" />
@@ -340,11 +340,11 @@
                                                    Foreground="#FF7CF0BE" />
                                     </Border>
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,-4,1,0">
-                                    <TextBlock Text="FPS" Style="{StaticResource CaptionTiny}" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,-4,1,0"
+                                            Visibility="{Binding FrameGenBadgeVisible, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="OUTPUT" Style="{StaticResource CaptionTiny}" />
                                     <TextBlock Text="{Binding FrameGenFpsDisplay}" FontSize="10.5" FontWeight="SemiBold"
-                                               Foreground="#FF8FE9FF" Margin="7,0,0,0"
-                                               Visibility="{Binding FrameGenBadgeVisible, Converter={StaticResource BoolToVis}}" />
+                                               Foreground="#FF8FE9FF" Margin="7,0,0,0" />
                                 </StackPanel>
                             </StackPanel>
                         </Grid>

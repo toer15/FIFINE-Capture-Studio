@@ -146,6 +146,18 @@ public sealed class CaptureSession : IAsyncDisposable
     public string? ActiveEncoder => _run?.Encoder ?? _activeOptions?.Encoder.Id;
     public string? ActiveContainer => _run?.Container.ToString();
     public bool HasSignal => (DateTime.Now - _lastFrameAt).TotalSeconds < 3;
+
+    /// <summary>Drops the last frame timestamp so a platform/source change shows the setup screen
+    /// immediately instead of retaining the previous signal for up to three seconds.</summary>
+    public void ResetSignal()
+    {
+        _lastFrameAt = DateTime.MinValue;
+        _lastFrameWall = DateTime.MinValue;
+        _measuredFps = 0;
+        _fpsWindowFrames = 0;
+        _fpsWindowStart = DateTime.Now;
+    }
+
     public DateTime PreviewStartedAt { get; private set; } = DateTime.MaxValue;
     public long RecordedFrames { get; private set; }
     public double LastRecordSpeed { get; private set; }
@@ -229,6 +241,7 @@ public sealed class CaptureSession : IAsyncDisposable
             }
 
             await StopProcessAsync(intentional: true).ConfigureAwait(false);
+            ResetSignal();
             PrepareRing(options);
             var started = await StartProcessAsync(options).ConfigureAwait(false);
             if (!started)
@@ -265,6 +278,7 @@ public sealed class CaptureSession : IAsyncDisposable
             }
 
             await StopProcessAsync(intentional: true).ConfigureAwait(false);
+            ResetSignal();
             if (_console.IsStreaming || _console.State != ConsoleStreamState.Idle)
             {
                 await _console.StopAsync().ConfigureAwait(false);
@@ -293,6 +307,7 @@ public sealed class CaptureSession : IAsyncDisposable
         IsPreviewing = false;
         PreviewStartedAt = DateTime.MaxValue;
         _previewGaps = 0;
+        ResetSignal();
         await StartPreviewAsync(restart: true).ConfigureAwait(false);
     }
 

@@ -192,19 +192,26 @@ public sealed partial class StudioViewModel
     {
         get
         {
-            var source = _services.Session.MeasuredFps > 0
-                ? _services.Session.MeasuredFps
-                : _services.FrameGeneration.SourceFps;
-            var presented = _nativePresenter?.PresentedFps ?? 0;
-            var generated = _services.FrameGeneration.GeneratedFps;
+            if (!FrameGenerationEnabled) return "Frame generation is off.";
+
+            var reading = CurrentGameReading;
+            var source = reading is { Available: true, Fps: double gameFps }
+                ? gameFps
+                : _services.Session.MeasuredFps > 0
+                    ? _services.Session.MeasuredFps
+                    : _services.FrameGeneration.SourceFps;
             if (source <= 0)
             {
                 return "Waiting for gameplay frames…";
             }
 
+            var estimate = reading.Available && reading.IsEstimate ? "≈" : string.Empty;
+            var target = source * FrameGenMultiplier;
+            var targetText = $"{estimate}{target:0} FPS {FrameGenMultiplier}× target";
+            var presented = _nativePresenter?.PresentedFps ?? 0;
             return presented > 0
-                ? $"{source:0} FPS source → {generated:0} generated/s → {presented:0} FPS presented"
-                : $"{source:0} FPS source → 2× interpolation";
+                ? $"{estimate}{source:0} FPS source → {targetText} → {presented:0} FPS presented"
+                : $"{estimate}{source:0} FPS source → {targetText}";
         }
     }
 
@@ -251,7 +258,7 @@ public sealed partial class StudioViewModel
         get
         {
             var refresh = DisplayRefresh.Get(IntPtr.Zero, out var monitor);
-            return $"{refresh} Hz · {monitor} · 2× target {(refresh >= 120 ? "supported" : "not supported")}";
+            return $"{refresh} Hz · {monitor} · {FrameGenMultiplierDisplay} target {(refresh >= 100 ? "supported" : "not supported")}";
         }
     }
 

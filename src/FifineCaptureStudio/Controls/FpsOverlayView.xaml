@@ -38,21 +38,21 @@
                                    VerticalAlignment="Bottom" Margin="4,0,0,4" />
                     </StackPanel>
                 </StackPanel>
-                <Border Width="1" Background="#334A5E7E" Margin="12,2,12,2" />
-                <StackPanel VerticalAlignment="Bottom" Margin="0,0,0,1">
-                    <TextBlock Text="{Binding GameFpsQualifier}" FontSize="9" Foreground="#FFB7C6DC" />
-                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <StackPanel Orientation="Horizontal"
-                                    Visibility="{Binding FrameGenOutputReady, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="GEN " FontSize="9.5" Foreground="#FF7E8DA3" />
-                            <TextBlock Text="{Binding GeneratedFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
-                            <TextBlock Text="   " FontSize="9.5" />
-                        </StackPanel>
-                        <TextBlock Text="PRES " FontSize="9.5" Foreground="#FF7E8DA3" />
-                        <TextBlock Text="{Binding PresentedFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
-                        <TextBlock Text="   IN " FontSize="9.5" Foreground="#FF7E8DA3" />
-                        <TextBlock Text="{Binding InputFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                <TextBlock Text="{Binding GameFpsQualifier}" FontSize="9" Foreground="#FFB7C6DC"
+                           MaxWidth="170" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal"
+                                Visibility="{Binding FrameGenOutputReady, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="GEN " FontSize="9.5" Foreground="#FF7E8DA3" />
+                        <TextBlock Text="{Binding GeneratedFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
+                        <TextBlock Text="   " FontSize="9.5" />
                     </StackPanel>
+                    <TextBlock Text="PRES " FontSize="9.5" Foreground="#FF7E8DA3" />
+                    <TextBlock Text="{Binding PresentedFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
+                    <TextBlock Text="   IN " FontSize="9.5" Foreground="#FF7E8DA3" />
+                    <TextBlock Text="{Binding InputFpsDisplay}" FontSize="10.5" Foreground="#FFE7EDF7" />
                 </StackPanel>
             </StackPanel>
         </StackPanel>

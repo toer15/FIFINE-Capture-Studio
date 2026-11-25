@@ -127,32 +127,67 @@ public sealed partial class StudioViewModel
         }
     }
 
+    private int FrameGenMultiplier => Math.Max(2, Config.FrameGeneration.Multiplier);
+
+    /// <summary>
+    /// The output the selected multiplier will produce from the current measured game rate. This is
+    /// deliberately derived from the game reading rather than the engine's instantaneous generated
+    /// frames: the target stays meaningful before the fullscreen presenter is opened, and matches the
+    /// source × multiplier shown in the rest of the UI.
+    /// </summary>
+    private (double? Fps, bool IsEstimate) FrameGenTarget
+    {
+        get
+        {
+            if (!FrameGenerationEnabled) return (null, false);
+            var reading = CurrentGameReading;
+            if (!reading.Available || reading.Fps is null) return (null, false);
+            return (reading.Fps.Value * FrameGenMultiplier, reading.IsEstimate);
+        }
+    }
+
     public string FrameGenOutputDisplay
     {
         get
         {
-            if (!FrameGenerationActive) return "—";
-            var total = _services.FrameGeneration.SourceFps + _services.FrameGeneration.GeneratedFps;
-            return total > 0 ? $"{total:0}" : "—";
+            var (target, estimate) = FrameGenTarget;
+            return target is null ? "—" : $"{(estimate ? "≈" : string.Empty)}{target:0}";
         }
     }
 
-    /// <summary>The only multiplier the interpolator implements; settings normalise it to 2.</summary>
-    public string FrameGenMultiplierDisplay => $"{Math.Max(2, Config.FrameGeneration.Multiplier)}×";
+    /// <summary>The selected live multiplier; settings normalise it to the implemented 2× mode.</summary>
+    public string FrameGenMultiplierDisplay => $"{FrameGenMultiplier}×";
 
     public bool FrameGenBadgeVisible => FrameGenerationEnabled;
 
+    /// <summary>True only when the presenter has produced real interpolated output.</summary>
     public bool FrameGenOutputReady => FrameGenerationActive &&
         (_services.FrameGeneration.SourceFps + _services.FrameGeneration.GeneratedFps) > 0;
 
-    public string FrameGenFpsDisplay => FrameGenOutputReady ? FrameGenOutputDisplay : "READY";
+    public string FrameGenFpsDisplay
+    {
+        get
+        {
+            var (target, estimate) = FrameGenTarget;
+            return target is null
+                ? (FrameGenerationEnabled ? "READY" : "—")
+                : $"{(estimate ? "≈" : string.Empty)}{target:0}";
+        }
+    }
 
-    public string FrameGenOutputSuffix => FrameGenOutputReady ? "FPS" : string.Empty;
+    public string FrameGenOutputSuffix => FrameGenTarget.Fps is not null ? "FPS" : string.Empty;
 
-    /// <summary>Game FPS followed by the generated output only while frame generation is enabled.</summary>
-    public string LiveFpsLabel => FrameGenerationEnabled
-        ? $"{GameFpsDisplay} FPS · {FrameGenMultiplierDisplay} {FrameGenFpsDisplay}"
-        : $"{GameFpsDisplay} FPS";
+    /// <summary>Game FPS followed by the selected multiplier's output while frame generation is enabled.</summary>
+    public string LiveFpsLabel
+    {
+        get
+        {
+            if (!FrameGenerationEnabled) return $"{GameFpsDisplay} FPS";
+            return FrameGenTarget.Fps is null
+                ? $"{GameFpsDisplay} FPS · {FrameGenMultiplierDisplay} READY"
+                : $"{GameFpsDisplay} FPS · {FrameGenMultiplierDisplay} {FrameGenFpsDisplay} FPS";
+        }
+    }
 
     public string GeneratedFpsDisplay => FrameGenerationActive && _services.FrameGeneration.GeneratedFps > 0
         ? $"{_services.FrameGeneration.GeneratedFps:0}"
