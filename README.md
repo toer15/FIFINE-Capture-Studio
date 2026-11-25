@@ -207,9 +207,12 @@ PS5 ──Remote Play──▶ nixani-engine.exe ──stdio protocol v3──�
   replay buffer, recording, encoder selection and statistics all work unchanged; audio is mixed into
   the same Audio Studio mixer.
 * Registration keys and account data are DPAPI-protected per Windows user.
-* The engine is AGPL-3.0 and is **not** bundled or downloaded — build it and point FIFINE at it in
-  Gaming Sources → PlayStation Remote Play. See [docs/CONSOLE-STREAMING.md](docs/CONSOLE-STREAMING.md)
-  and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+* The engine is AGPL-3.0 and is bundled as a separate program under `<app>\streaming\`; its licence
+  and upstream source offer are recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). See
+  [docs/CONSOLE-STREAMING.md](docs/CONSOLE-STREAMING.md).
+* A PS5 needs the PSN account ID during link-code registration. FIFINE offers a one-time
+  **Sign in to PSN** (Sony's own page in a WebView2 window) and keeps only the account ID; after
+  that, the pairing sheet asks for nothing but the 8-digit code shown on the TV.
 * Xbox home streaming is WebRTC-based and neither Greenlight nor xbox-xcloud-player can be embedded as
   a library, so no Xbox network video path is shipped; HDMI capture remains the Xbox path.
 
@@ -305,15 +308,16 @@ authentication or console video.
   render path; audibility could not be confirmed in this session.
 * Pairing self-test (`--pairing-test`): 10/10 checks pass against a mock agent on loopback
   (discovery, probe open/closed, code normalisation, store round-trip, no code persisted).
-* Pairing UI was driven with real input on this machine: PlayStation sheet opened from Gaming
-  Sources, a mock console listener on 127.0.0.1:9295 made the probe succeed, and the sheet showed
-  "Unsupported connection method" with the honest Remote Play explanation instead of a fake
-  connection. PC mode was then run end to end: "Capture this PC" started display capture, real
-  frames arrived, the sheet flipped to "Connected · receiving video" (1920×1080, 60 fps, 2/3 audio,
-  3.8 ms preview latency, quality Excellent) and the app switched to Live Capture automatically.
+* Pairing UI was driven with real input on this machine. The bundled engine started, discovered the
+  PS5 on the network (`1 console(s) found`), and the code-only sheet stayed free of an address field.
+  A PS5 account with no stored PSN ID is stopped before any request is sent, with the exact one-time
+  sign-in instruction; the Sony sign-in page itself loads in the app's WebView2 window. PC mode was
+  run end to end: "Capture this PC" started display capture, real frames arrived, the sheet flipped
+  to "Connected · receiving video" and the app switched to Live Capture automatically.
 * PlayStation/Xbox console pairing and console video reception were **not** tested: no console is
-  attached here, and the Remote Play registration handshake is not implemented. The feature is not
-  marked fully supported for consoles.
+  attached here. The code path is implemented against protocol v3, the bundled engine starts and
+  answers the handshake, and the pairing flow is exercised with a mock engine; a physical PS5 link
+  still needs a console and its PSN account ID.
 * No capture card or console was attached, so real UVC capture, passthrough and HDCP
   behaviour remain untested here. No other PC is available, so FIFINE Link Agent and network
   capture remain unimplemented/experimental.

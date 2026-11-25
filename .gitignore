@@ -31,3 +31,9 @@ desktop.ini
 
 # console streaming test diagnostics
 nixani-mock.log
+
+# downloaded engine/source inspection caches (the packaged engine lives in tools/streaming/nixani-engine)
+tools/streaming/cache/
+tools/streaming/nixani-extract/
+tools/streaming/nixani-engine-src/
+tools/streaming/chiaki-ng-src/

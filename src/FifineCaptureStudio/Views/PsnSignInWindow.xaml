@@ -1,0 +1,43 @@
+<Window x:Class="FifineCaptureStudio.Views.PsnSignInWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Sign in to PlayStation Network"
+        Width="560" Height="760"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        Background="#FF0B1020"
+        ResizeMode="CanResize"
+        ShowInTaskbar="False">
+    <Border Background="#FF0B1020" BorderBrush="#FF2A3550" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="54" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="54" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Background="#FF11182A" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <StackPanel VerticalAlignment="Center" Margin="18,0,0,0">
+                    <TextBlock Text="PlayStation Network" Foreground="White" FontSize="14" FontWeight="SemiBold" />
+                    <TextBlock Text="Sign in once so this PS5 can accept the 8-digit link code"
+                               Foreground="#FF8D98AC" FontSize="10.5" Margin="0,2,0,0" />
+                </StackPanel>
+                <Button Content="✕" Width="34" Height="30" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Margin="0,0,14,0" Background="Transparent" Foreground="#FF8D98AC" BorderThickness="0"
+                        FontSize="14" Click="Cancel_Click" />
+            </Grid>
+
+            <wv2:WebView2 x:Name="Browser" Grid.Row="1" Margin="1,0,1,0" />
+
+            <Grid Grid.Row="2" Background="#FF11182A">
+                <TextBlock x:Name="StatusText" Foreground="#FF8D98AC" FontSize="10.5" VerticalAlignment="Center"
+                           Margin="16,0,110,0" TextTrimming="CharacterEllipsis"
+                           Text="Loading Sony's sign-in page…" />
+                <Button Content="Cancel" Width="82" Height="30" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Margin="0,0,14,0" Background="#FF1A2338" Foreground="#FFE6EBF5" BorderBrush="#FF2A3550"
+                        BorderThickness="1" Click="Cancel_Click" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

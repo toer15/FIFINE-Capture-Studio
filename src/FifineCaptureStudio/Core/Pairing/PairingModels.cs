@@ -32,7 +32,8 @@ public sealed record PairingDevice(
     int Port,
     PairingPlatform Platform,
     string Transport,
-    string Detail)
+    string Detail,
+    bool IsPs5 = false)
 {
     public override string ToString() => $"{Name} · {Address}";
 }

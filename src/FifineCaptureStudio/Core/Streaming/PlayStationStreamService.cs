@@ -7,8 +7,8 @@ namespace FifineCaptureStudio.Core.Streaming;
 /// <summary>
 /// PlayStation Remote Play through the Nixani Engine process: discovery, linking with the console's
 /// 8-digit code, session start, compressed video into the capture pipeline and console audio into
-/// the mixer. No part of the engine is bundled; it is a separate AGPL-3.0 executable that FIFINE
-/// starts and talks to over stdin/stdout (see THIRD-PARTY-NOTICES.md).
+/// the mixer. The engine is a separate AGPL-3.0 executable bundled under the app's streaming folder;
+/// FIFINE starts it and talks to it over stdin/stdout (see THIRD-PARTY-NOTICES.md).
 /// </summary>
 public sealed class PlayStationStreamService : IAsyncDisposable
 {
@@ -85,7 +85,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         if (path is null)
         {
             SetState(ConsoleStreamState.EngineMissing,
-                "The PlayStation streaming engine is not installed. Build nixani-engine and point Settings → PlayStation at it.",
+                "The bundled PlayStation streaming engine is missing. Reinstall FIFINE Capture Studio, or set the engine path under Gaming Sources → PlayStation Remote Play.",
                 "nixani-engine.exe not found");
             return false;
         }
@@ -208,7 +208,7 @@ public sealed class PlayStationStreamService : IAsyncDisposable
     }
 
     /// <summary>Links with the console using the 8-digit code shown on the TV.</summary>
-    public async Task<NixaniRegistration> RegisterAsync(string address, string code, uint consolePin, CancellationToken token)
+    public async Task<NixaniRegistration> RegisterAsync(string address, string code, uint consolePin, bool isPs5, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(address))
         {
@@ -231,13 +231,25 @@ public sealed class PlayStationStreamService : IAsyncDisposable
         var ps = _settings.Current.PlayStation;
         ps.ConsoleAddress = address.Trim();
         ps.ConsolePin = consolePin;
+        ps.IsPs5 = isPs5;
         var accountId = ParseAccountId(ps.AccountId);
+
+        // The PS5 validates the PSN account ID during link-code registration and rejects an
+        // all-zero one with CE-110032-7. Stop before the engine sends a request that cannot work.
+        if (isPs5 && accountId.All(value => value == 0))
+        {
+            const string missingAccount = "The PS5 needs your PSN account ID once before it accepts the code. " +
+                "Add it under Gaming Sources → PlayStation Remote Play, then show a new code on the console and press Connect.";
+            SetState(ConsoleStreamState.Failed, missingAccount, "PSN account ID required");
+            return new NixaniRegistration(false, missingAccount, string.Empty, Array.Empty<byte>(), 0,
+                Array.Empty<byte>(), Array.Empty<byte>(), 0, 0);
+        }
 
         SetState(ConsoleStreamState.Registering, "Registering with the console — keep the code on screen…");
         NixaniRegistration result;
         try
         {
-            result = await _client!.RegisterAsync(ps.ConsoleAddress, ps.IsPs5, linkCode, consolePin,
+            result = await _client!.RegisterAsync(ps.ConsoleAddress, isPs5, linkCode, consolePin,
                 accountId, TimeSpan.FromSeconds(90), token).ConfigureAwait(false);
         }
         catch (Exception ex)

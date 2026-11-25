@@ -365,17 +365,27 @@
                             <TextBlock Text="{Binding ConsoleEngineText}" Style="{StaticResource CaptionTiny}" Foreground="#FF7C879B"
                                        TextWrapping="Wrap" Margin="0,4,0,0" />
 
-                            <TextBlock Text="PSN account ID (PS5 registration)" Style="{StaticResource SourceLabel}" Margin="0,10,0,0" />
-                            <TextBox Height="30" Padding="8,4" Background="#FF101725" Foreground="#FFE6EBF5"
-                                     BorderBrush="#FF253048" BorderThickness="1"
-                                     Text="{Binding PlayStationAccountId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Hex or base64 PSN account ID, as documented for PS5 Remote Play registration." />
+                            <TextBlock Text="PSN account ID (PS5 registration, set once)" Style="{StaticResource SourceLabel}" Margin="0,10,0,0" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Height="30" Padding="8,4" Background="#FF101725" Foreground="#FFE6EBF5"
+                                         BorderBrush="#FF253048" BorderThickness="1"
+                                         Text="{Binding PlayStationAccountId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Hex or base64 PSN account ID. Sony requires it when a PS5 accepts the 8-digit link code. Sign in fills it automatically." />
+                                <Button Grid.Column="1" Height="30" Width="104" Margin="8,0,0,0"
+                                        Style="{StaticResource GhostButton}" FontSize="11"
+                                        Content="Sign in to PSN" Command="{Binding SignInPsnCommand}"
+                                        ToolTip="One-time Sony sign-in. Only the PSN account ID is kept." />
+                            </Grid>
 
-                            <TextBlock Text="Remote Play engine path (nixani-engine.exe)" Style="{StaticResource SourceLabel}" Margin="0,8,0,0" />
+                            <TextBlock Text="Remote Play engine path (optional override)" Style="{StaticResource SourceLabel}" Margin="0,8,0,0" />
                             <TextBox Height="30" Padding="8,4" Background="#FF101725" Foreground="#FFE6EBF5"
                                      BorderBrush="#FF253048" BorderThickness="1"
                                      Text="{Binding PlayStationEnginePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Leave empty to search the app folder and PATH." />
+                                     ToolTip="Leave empty to use the engine bundled in the app's streaming folder." />
 
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <Button Style="{StaticResource AccentButton}" Height="32" Width="150" Content="Find &amp; pair console"

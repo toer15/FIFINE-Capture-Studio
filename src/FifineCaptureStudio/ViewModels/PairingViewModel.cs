@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Input;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Pairing;
+using FifineCaptureStudio.Views;
 
 namespace FifineCaptureStudio.ViewModels;
 
@@ -289,9 +290,8 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         if (!_studio.PlayStation.IsEngineAvailable)
         {
             Stage = PairingStage.Unsupported;
-            Status = "The PlayStation streaming engine (nixani-engine.exe) is not installed, so console discovery and Remote Play " +
-                     "are unavailable. Build it from github.com/Nixani/nixani-engine and set its path in Settings → PlayStation, " +
-                     "or use HDMI capture below.";
+            Status = "The bundled PlayStation streaming engine (nixani-engine.exe) is missing, so console discovery and " +
+                     "Remote Play are unavailable. Reinstall FIFINE Capture Studio, or use HDMI capture below.";
             return;
         }
 
@@ -307,7 +307,8 @@ public sealed class PairingViewModel : INotifyPropertyChanged
                     LanDiscovery.PlayStationPort,
                     PairingPlatform.PlayStation,
                     "Remote Play engine",
-                    $"{host.StateLabel} · {(host.IsPs5 ? "PS5" : "PS4")} · {host.SystemVersion}"));
+                    $"{host.StateLabel} · {(host.IsPs5 ? "PS5" : "PS4")} · {host.SystemVersion}",
+                    host.IsPs5));
             }
 
             if (hosts.Count == 0)
@@ -371,6 +372,24 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         }
 
         var address = SelectedDevice.Address;
+        var isPs5 = SelectedDevice.IsPs5;
+
+        // A PS5 validates the PSN account ID during link-code registration. Ask for Sony's
+        // sign-in once, then every later pairing only needs the 8 digits shown on the TV.
+        if (isPs5 && string.IsNullOrWhiteSpace(_studio.PlayStationAccountId))
+        {
+            Stage = PairingStage.Authenticating;
+            Status = "This PS5 needs a one-time PlayStation Network sign-in before it can accept the code…";
+            var accountId = PsnSignInWindow.PromptForAccountId();
+            if (string.IsNullOrWhiteSpace(accountId))
+            {
+                Stage = PairingStage.Failed;
+                Status = "The PlayStation Network sign-in was cancelled. Press Connect to try again with a new code from the console.";
+                return;
+            }
+
+            _studio.PlayStationAccountId = accountId;
+        }
 
         Stage = PairingStage.Authenticating;
         Status = "Registering with the console…";
@@ -378,7 +397,7 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         var code = Code;
         Code = string.Empty;
         var registration = await _studio.PlayStation
-            .RegisterAsync(address, code, 0, CancellationToken.None)
+            .RegisterAsync(address, code, 0, isPs5, CancellationToken.None)
             .ConfigureAwait(true);
 
         if (!registration.Ok)

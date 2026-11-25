@@ -2,6 +2,7 @@ using System.Windows.Input;
 using FifineCaptureStudio.Core;
 using FifineCaptureStudio.Core.Streaming.Nixani;
 using FifineCaptureStudio.Core.Streaming;
+using FifineCaptureStudio.Views;
 
 namespace FifineCaptureStudio.ViewModels;
 
@@ -43,7 +44,7 @@ public sealed partial class StudioViewModel
 
     public string ConsoleEngineText => _services.PlayStation.EnginePath is { } path
         ? "Engine: " + System.IO.Path.GetFileName(path) + " " + (_services.PlayStation.EngineVersion ?? string.Empty)
-        : "Engine: nixani-engine.exe not found — build it and set the path in Settings → PlayStation.";
+        : "Engine: bundled nixani-engine.exe not found — reinstall FIFINE or set the engine path in Gaming Sources → PlayStation Remote Play.";
 
     public string ConsoleCodecLabel => _services.PlayStation.Options.CodecName;
 
@@ -94,6 +95,19 @@ public sealed partial class StudioViewModel
             Raise();
         }
     }
+
+    private ICommand? _signInPsnCommand;
+    public ICommand SignInPsnCommand => _signInPsnCommand ??= new RelayCommand(_ =>
+    {
+        var accountId = PsnSignInWindow.PromptForAccountId();
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            return;
+        }
+
+        PlayStationAccountId = accountId;
+        Raise(nameof(ConsoleStatusText));
+    });
 
     public string PlayStationEnginePath
     {

@@ -1,0 +1,16 @@
+Nixani Engine 1.2.0
+
+Nixani Engine is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License, version 3. The full text is in LICENSE-AGPL-3.0.txt next to
+this file. It comes with no warranty.
+
+Source code of this version: https://github.com/Nixani/nixani-engine (tag v1.2.0)
+
+It is built on chiaki-ng (https://github.com/streetpea/chiaki-ng, AGPL-3.0 with an OpenSSL
+exception). The other bundled components and their licence texts are in THIRD-PARTY-NOTICES.txt.
+
+The engine is a separate program. The program that starts it only exchanges messages with it
+(PROTOCOL.md in the source) and is not part of it.
+
+An unofficial project. PlayStation, PS4, PS5 and DualSense are trademarks of
+Sony Interactive Entertainment, which is not affiliated with it.

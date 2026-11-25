@@ -1,23 +1,27 @@
 # Third-party notices
 
-FIFINE Capture Studio is distributed under the terms in `LICENSE`. It talks to the following
-third-party software at runtime. **None of the components below are bundled, linked or modified by
-this repository**; they are installed by the user, and their own licences apply to them.
+FIFINE Capture Studio is distributed under the terms in `LICENSE`. It uses the following
+third-party software. The Nixani Remote Play engine is bundled as a separate program; the other
+components below are installed by the user, and their own licences apply to them.
 
-## Nixani Engine — AGPL-3.0
+## Nixani Engine — AGPL-3.0 (bundled)
 
 * Project: <https://github.com/Nixani/nixani-engine>
-* Licence: GNU Affero General Public License v3.0 (repository `LICENSE`)
+* Bundled version: 1.2.0, protocol v3
+* Corresponding source: <https://github.com/Nixani/nixani-engine/tree/v1.2.0>
+* Licence: GNU Affero General Public License v3.0 (`streaming\LICENSE-AGPL-3.0.txt`)
 * Upstream: <https://github.com/chiaki-ng/chiaki-ng> (`libchiaki`, also AGPL-3.0)
 
 FIFINE starts `nixani-engine.exe` as a **separate process** and communicates with it only through
-its documented standard-input/standard-output message protocol. No engine code is copied into,
-linked with, or redistributed inside FIFINE Capture Studio. The engine is not part of the installer
-and is not downloaded automatically: users who want PlayStation Remote Play build or obtain it
-themselves and point FIFINE at the executable (Settings → PlayStation engine path).
+its documented standard-input/standard-output message protocol. No engine code is copied into or
+linked with FIFINE Capture Studio. The engine binary is redistributed unmodified under
+`streaming\` in the installer, together with its own licence and third-party notice files:
+`nixani-engine.exe`, its runtime DLLs, `LICENSE.txt`, `LICENSE-AGPL-3.0.txt` and
+`THIRD-PARTY-NOTICES.txt`.
 
-If you redistribute FIFINE together with a build of Nixani Engine, you must comply with the AGPL for
-that engine build — including offering its complete corresponding source — and keep this notice.
+The complete corresponding source for the bundled engine is the upstream `v1.2.0` tag linked above.
+If you redistribute FIFINE, keep the engine's licence files with it and preserve that source offer.
+The engine's own third-party notice file lists every component and licence inside the engine build.
 
 ## Nixani Engine protocol description — MIT
 
@@ -44,6 +48,12 @@ from a reviewed licence position.
 
 FIFINE downloads the BtbN GPL build from <https://github.com/BtbN/FFmpeg-Builds> on request and
 invokes it as a separate executable (`ffmpeg`, `ffprobe`). It is not redistributed in this repository.
+
+## Microsoft Edge WebView2 — Microsoft licence
+
+<https://learn.microsoft.com/microsoft-edge/webview2/> — hosts Sony's PlayStation Network sign-in
+page inside the app. The WebView2 runtime is a Microsoft Edge component installed by Windows or the
+user; the application references `Microsoft.Web.WebView2` and does not redistribute the runtime.
 
 ## Velopack — MIT
 

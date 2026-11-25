@@ -12,7 +12,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
-    <Version>1.2.2</Version>
+    <Version>1.2.3</Version>
     <!-- Keep assembly identity stable across patches; file/product versions follow $(Version). -->
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <StartupObject>FifineCaptureStudio.Program</StartupObject>
@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3351.48" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="SharpDX.D3DCompiler" Version="4.2.0" />
     <PackageReference Include="SharpDX.Direct3D11" Version="4.2.0" />
@@ -50,6 +51,16 @@
 
   <ItemGroup>
     <AssemblyMetadata Include="GitHubRepository" Value="$(GitHubRepository)" />
+  </ItemGroup>
+
+  <!-- The Remote Play engine is a separate AGPL-3.0 program; ship it next to the app so
+       PS5/PS4 pairing works without a manual engine path. -->
+  <ItemGroup>
+    <Content Include="..\..\tools\streaming\nixani-engine\**\*">
+      <Link>streaming\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

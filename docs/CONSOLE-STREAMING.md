@@ -44,13 +44,18 @@ PS5 / PS4  ──Remote Play──▶  nixani-engine.exe  ──stdin/stdout pro
 
 ### Requirements
 
-The engine is a separate AGPL-3.0 program and is not bundled. Build it from
-<https://github.com/Nixani/nixani-engine> (Visual Studio 2022 Build Tools + Clang, vcpkg, Python) or
-download it from its project page, then set the path in **Gaming Sources → PlayStation Remote Play**.
-FIFINE also looks in `<app>\streaming\nixani-engine.exe`, the app-data `streaming` folder, and `PATH`.
+The engine is a separate AGPL-3.0 program and is bundled with the app at
+`<app>\streaming\nixani-engine.exe` (Nixani Engine 1.2.0, protocol v3). Its licence texts and source
+URL are in that folder and in `THIRD-PARTY-NOTICES.md`. No build or download is needed. The
+**Remote Play engine path** field is an optional override for testing another build; FIFINE also
+looks at the app-data `streaming` folder and `PATH`.
 
-PS5 registration normally needs the PSN account ID (hex or base64) because the console ties the
-client to the account; PS4 does not. The field is in the same card.
+PS5 registration needs the PSN account ID (hex or base64) because the console ties the client to
+the account; PS4 does not. The field is in the same card, and **Sign in to PSN** fills it from Sony's
+own sign-in page in a WebView2 window; only the account ID is stored, never the password or OAuth
+token. Without it the PS5 rejects the link with `CE-110032-7` (invalid PSN ID), so FIFINE stops
+before sending an all-zero ID and says what to do. After the one-time sign-in, the pairing sheet
+only asks for the 8-digit code shown on the TV.
 
 ## Xbox (not implemented)
 
@@ -71,11 +76,12 @@ console for verification.
 | Video reception | 180 access units streamed by the mock; client counted frames, stats and audio packets |
 | Decode through the named pipe | Real H.264 asset pushed through `VideoPipeFeed`; FFmpeg decoded it into an MP4 > 10 KB |
 | DPAPI credential storage | Round-trip test; wrong-user/corrupt blob returns null |
+| Real engine handshake | Bundled `nixani-engine.exe` 1.2.0 reports protocol 3, starts and answers `Hello`; discovery found the PS5 on this network |
+| PSN sign-in page | Sony's sign-in page loads in the app's WebView2 window; account-ID exchange requires a real PSN account and was not completed here |
 | Link-code and PSN account-id parsing | Unit tests |
 | UI | All ten views smoke-tested; PlayStation card added to Gaming Sources |
 
 **Not verified:** a physical PS5/PS4 has never been connected here (no console is attached to this
-machine), and `nixani-engine.exe` itself is not built in this environment. Protocol compliance is
-verified against the published specification with a mock engine, not against the real engine and
-console. Do not describe PlayStation streaming as "hardware verified" until a console delivers real
-frames.
+machine). Protocol compliance is verified against the published specification, the mock engine and
+the real engine's handshake, not against a console. Do not describe PlayStation streaming as
+"hardware verified" until a console delivers real frames.
