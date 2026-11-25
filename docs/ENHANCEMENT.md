@@ -139,12 +139,13 @@ genuine limit, not presented as a passing real-time configuration. The combined 
 also CPU-constrained: its 46 s wall time produced 30.27 s of valid video. The recording stayed full
 resolution and responsive throughout; it did not claim real-time encoding under that synthetic load.
 
-The full test suite is **115 passing**. The new `PreviewFallbackMonitor` tests cover the 45% threshold,
+The full test suite is **116 passing**. The new `PreviewFallbackMonitor` tests cover the 45% threshold,
 the exact 89/90-frame boundary, recovery of the consecutive run, and manual re-enable; the
 `NativePipelineTests` cover the 4K test-pattern arguments, native preview sizing, 4K→1440 filtering,
 and the fact that a 1600 px preview fallback leaves the 4K recording filter/output unchanged. A
 `RecordingSessionIntegrationTests` case starts and stops a real `CaptureSession` test-pattern
-recording and probes the finalized file's dimensions, codecs and duration.
+recording and probes the finalized file's dimensions, codecs and duration. A `ProcessLaunchTests`
+case covers the fresh-install case where the app-data working directory does not exist yet.
 
 Reproduce the headless benchmark (no UI, real GPU work, writes `%LOCALAPPDATA%\FifineCaptureStudioData\enhancement-bench.txt`):
 
@@ -393,7 +394,7 @@ state and display refresh.
 
 `FpsMonitorTests` covers 30/40/60-in-60 cadences, repeated frames, codec-sized noise, a thin moving
 object on a static scene, static scenes, scene cuts, PresentMon CSV quoting/BOM, multi-chain primary
-selection and settings normalisation. The full suite is **115 passing**.
+selection and settings normalisation. The full suite is **116 passing**.
 
 A live 15 s Performance run with enhancement and the overlay enabled presented **1691 frames at
 119.0 FPS** on the 280 Hz display, with 849 generated frames, 13.87 ms average inference (15.60 ms

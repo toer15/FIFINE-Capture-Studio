@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 
 namespace FifineCaptureStudio.Core;
@@ -47,6 +48,12 @@ public static class Proc
         bool redirectStdin = true,
         string? workingDirectory = null)
     {
+        var cwd = workingDirectory ?? AppPaths.Root;
+        // A fresh install has no app-data directory until something writes to it. Create the
+        // working directory before starting the process; otherwise Process.Start fails with
+        // "The directory name is invalid" even though the executable itself is available.
+        Directory.CreateDirectory(cwd);
+
         var psi = new ProcessStartInfo
         {
             FileName = exe,
@@ -55,9 +62,9 @@ public static class Proc
             RedirectStandardOutput = redirectStdout,
             RedirectStandardError = redirectStderr,
             RedirectStandardInput = redirectStdin,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            WorkingDirectory = workingDirectory ?? AppPaths.Root
+            StandardOutputEncoding = redirectStdout ? Encoding.UTF8 : null,
+            StandardErrorEncoding = redirectStderr ? Encoding.UTF8 : null,
+            WorkingDirectory = cwd
         };
 
         foreach (var a in args)
