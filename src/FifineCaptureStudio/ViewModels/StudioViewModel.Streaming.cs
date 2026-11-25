@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using FifineCaptureStudio.Core;
+using FifineCaptureStudio.Core.Accounts;
 using FifineCaptureStudio.Core.Streaming.Nixani;
 using FifineCaptureStudio.Core.Streaming;
 using FifineCaptureStudio.Views;
@@ -12,7 +13,13 @@ namespace FifineCaptureStudio.ViewModels;
 /// </summary>
 public sealed partial class StudioViewModel
 {
+    private readonly WindowAccountInteraction _accountInteraction = new();
+    private string? _xboxClientIdDraft;
+
     public PlayStationStreamService PlayStation => _services.PlayStation;
+    public AccountSession XboxAccount => _accounts.Xbox;
+    public AccountSession PlayStationAccount => _accounts.PlayStation;
+    public AccountSession PcAccount => _accounts.Pc;
 
     public bool IsConsoleSource => Config.Capture.SourceKind == CaptureSourceKind.ConsoleStream;
     public bool IsConsoleStreaming => _services.PlayStation.IsStreaming;
@@ -97,17 +104,100 @@ public sealed partial class StudioViewModel
     }
 
     private ICommand? _signInPsnCommand;
-    public ICommand SignInPsnCommand => _signInPsnCommand ??= new RelayCommand(_ =>
+    public ICommand SignInPsnCommand => _signInPsnCommand ??= new AsyncRelayCommand(async _ =>
     {
-        var accountId = PsnSignInWindow.PromptForAccountId();
-        if (string.IsNullOrWhiteSpace(accountId))
+        await SignInPlayStationAsync();
+    });
+
+    /// <summary>Opens Sony's sign-in window and returns true when an account ID is available.</summary>
+    public async Task<bool> SignInPlayStationAsync()
+    {
+        await _accounts.SignInAsync(AccountPlatform.PlayStation, _accountInteraction);
+        Raise(nameof(PlayStationAccountId));
+        Raise(nameof(PlayStationAccount));
+        Raise(nameof(ConsoleStatusText));
+        return !string.IsNullOrWhiteSpace(PlayStationAccountId);
+    }
+
+    private ICommand? _signOutPsnCommand;
+    public ICommand SignOutPsnCommand => _signOutPsnCommand ??= new RelayCommand(_ =>
+    {
+        _accounts.SignOut(AccountPlatform.PlayStation);
+        Raise(nameof(PlayStationAccountId));
+        Raise(nameof(PlayStationAccount));
+        Raise(nameof(ConsoleStatusText));
+    });
+
+    public string XboxClientId
+    {
+        get => _xboxClientIdDraft ?? Config.Xbox.ClientId;
+        set
+        {
+            _xboxClientIdDraft = value;
+            Raise();
+        }
+    }
+
+    private ICommand? _saveXboxClientIdCommand;
+    public ICommand SaveXboxClientIdCommand => _saveXboxClientIdCommand ??= new RelayCommand(_ =>
+    {
+        var saved = _accounts.SetXboxClientId(XboxClientId);
+        Raise(nameof(XboxAccount));
+        if (!saved)
         {
             return;
         }
 
-        PlayStationAccountId = accountId;
-        Raise(nameof(ConsoleStatusText));
+        _xboxClientIdDraft = null;
+        Raise(nameof(XboxClientId));
+        Notify("Xbox client ID saved. Sign in with Microsoft to continue.", false);
     });
+
+    private ICommand? _signInXboxCommand;
+    public ICommand SignInXboxCommand => _signInXboxCommand ??= new AsyncRelayCommand(async _ =>
+    {
+        await _accounts.SignInAsync(AccountPlatform.Xbox, _accountInteraction);
+        Raise(nameof(XboxAccount));
+    });
+
+    private ICommand? _signOutXboxCommand;
+    public ICommand SignOutXboxCommand => _signOutXboxCommand ??= new RelayCommand(_ =>
+    {
+        _accounts.SignOut(AccountPlatform.Xbox);
+        Raise(nameof(XboxAccount));
+    });
+
+    private ICommand? _openXboxVerificationCommand;
+    public ICommand OpenXboxVerificationCommand => _openXboxVerificationCommand ??= new RelayCommand(_ =>
+    {
+        if (Uri.TryCreate(XboxAccount.VerificationUri, UriKind.Absolute, out var uri))
+        {
+            _accountInteraction.OpenExternal(uri);
+        }
+    });
+
+    private ICommand? _openXboxSetupCommand;
+    public ICommand OpenXboxSetupCommand => _openXboxSetupCommand ??= new RelayCommand(_ =>
+    {
+        _accountInteraction.OpenExternal(new Uri(
+            "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/CreateApplicationBlade"));
+    });
+
+    private async Task RestoreAccountsAsync()
+    {
+        try
+        {
+            await _accounts.RestoreAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Account restore failed: " + ex.Message);
+        }
+
+        Raise(nameof(PlayStationAccountId));
+        Raise(nameof(PlayStationAccount));
+        Raise(nameof(XboxAccount));
+    }
 
     public string PlayStationEnginePath
     {

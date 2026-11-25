@@ -132,6 +132,18 @@ public sealed class PlayStationSettings
     public bool ForwardController { get; set; } = true;
     public uint ConsolePin { get; set; }
     public string AccountId { get; set; } = string.Empty;
+
+    /// <summary>The Online ID Sony returned for the signed-in account. Empty when not signed in.</summary>
+    public string OnlineId { get; set; } = string.Empty;
+
+    /// <summary>DPAPI-protected OAuth access token. Never plain text in settings.json.</summary>
+    public string AccessTokenProtected { get; set; } = string.Empty;
+
+    /// <summary>DPAPI-protected OAuth refresh token. Never plain text in settings.json.</summary>
+    public string RefreshTokenProtected { get; set; } = string.Empty;
+
+    public DateTimeOffset AccessTokenExpiresUtc { get; set; }
+
     public string RegistKey { get; set; } = string.Empty;
     public string RpKey { get; set; } = string.Empty;
 
@@ -156,6 +168,17 @@ public sealed class XboxSettings
     public string ConsoleId { get; set; } = string.Empty;
     public string ConsoleName { get; set; } = string.Empty;
     public string Region { get; set; } = "en-US";
+
+    /// <summary>
+    /// Application (client) ID of the Microsoft Entra app used for Xbox Live sign-in. This is a
+    /// public client identifier, not a secret. Xbox Live sign-in cannot start without it.
+    /// </summary>
+    public string ClientId { get; set; } = string.Empty;
+
+    /// <summary>DPAPI-protected Microsoft refresh token. Never plain text in settings.json.</summary>
+    public string RefreshTokenProtected { get; set; } = string.Empty;
+
+    /// <summary>Legacy field kept so older settings files round-trip. New sign-ins use the refresh token.</summary>
     public string Token { get; set; } = string.Empty;
     public bool ForwardController { get; set; } = true;
 
@@ -400,6 +423,9 @@ public sealed class AppSettings
         s.PlayStation.Fps = s.PlayStation.Fps >= 60 ? 60 : 30;
         s.PlayStation.BitrateKbps = Math.Clamp(s.PlayStation.BitrateKbps, 0, 100000);
         s.PlayStation.EnginePath = (s.PlayStation.EnginePath ?? string.Empty).Trim();
+        s.PlayStation.AccountId = (s.PlayStation.AccountId ?? string.Empty).Trim();
+        s.PlayStation.OnlineId = (s.PlayStation.OnlineId ?? string.Empty).Trim();
+        s.Xbox.ClientId = (s.Xbox.ClientId ?? string.Empty).Trim();
 
         s.Updates.CheckIntervalMinutes = Math.Clamp(s.Updates.CheckIntervalMinutes, 30, 10080);
         s.Updates.Repository = (s.Updates.Repository ?? string.Empty).Trim();

@@ -48,9 +48,10 @@ bundled engine. `nixani-engine.exe --version` must report the protocol version t
 3. On the console choose **Link Device** (PS5) or **Add Device** (PS4); the TV shows 8 digits.
 4. Enter the digits in FIFINE and press Connect. FIFINE discovers the console, registers, starts the
    session, and opens Live Capture once real frames arrive.
-5. For a PS5, use **Sign in to PSN** once under Gaming Sources → PlayStation Remote Play (or paste
-   a PSN account ID). Sony requires the account ID during link-code registration; the pairing sheet
-   itself only asks for the 8-digit code.
+5. For a PS5, use **Sign in with Sony** once under Gaming Sources → Platform accounts (or paste a
+   PSN account ID in that row). Sony requires the account ID during link-code registration; the
+   signed-in panel shows the actual Online ID, and the pairing sheet itself only asks for the
+   8-digit code.
 
 ## Tests without a console
 

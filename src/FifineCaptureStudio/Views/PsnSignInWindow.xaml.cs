@@ -1,38 +1,48 @@
 using System.Windows;
 using System.Windows.Input;
-using FifineCaptureStudio.Core.Streaming.Nixani;
+using FifineCaptureStudio.Core.Accounts;
 using Microsoft.Web.WebView2.Core;
 
 namespace FifineCaptureStudio.Views;
 
 /// <summary>
-/// Hosts Sony's PSN sign-in page and captures the OAuth redirect. The result is the base64 PSN
-/// account ID the PS5 expects during link-code registration; no password or token is stored.
+/// Hosts Sony's PSN sign-in page and captures the OAuth redirect. The result includes the real
+/// Online ID plus short-lived tokens for secure storage; no password is ever read by FIFINE.
 /// </summary>
 public partial class PsnSignInWindow : Window
 {
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly PsnAccountLookup _lookup = new();
     private bool _started;
+    private bool _completed;
 
     public PsnSignInWindow()
     {
         InitializeComponent();
         Loaded += OnLoaded;
-        Closed += (_, _) => _lifetime.Cancel();
+        Closed += (_, _) =>
+        {
+            _lifetime.Cancel();
+            _lookup.Dispose();
+        };
     }
 
-    public string? AccountId { get; private set; }
+    public PsnAuthResult? Auth { get; private set; }
 
-    /// <summary>Shows the sign-in window modally and returns the account ID, or null if cancelled.</summary>
-    public static string? PromptForAccountId()
+    /// <summary>Shows Sony's sign-in page and returns the authenticated account, or null if cancelled.</summary>
+    public static PsnAuthResult? PromptForAuth()
     {
         var window = new PsnSignInWindow();
-        if (Application.Current?.MainWindow is { IsLoaded: true } owner && !ReferenceEquals(owner, window))
+        var owner = Application.Current?.Windows
+            .OfType<Window>()
+            .LastOrDefault(candidate => candidate.IsLoaded && candidate.IsActive && !ReferenceEquals(candidate, window))
+            ?? Application.Current?.MainWindow;
+        if (owner is { IsLoaded: true } && !ReferenceEquals(owner, window))
         {
             window.Owner = owner;
         }
 
-        return window.ShowDialog() == true ? window.AccountId : null;
+        return window.ShowDialog() == true ? window.Auth : null;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -78,6 +88,11 @@ public partial class PsnSignInWindow : Window
         }
 
         e.Cancel = true;
+        if (_completed)
+        {
+            return;
+        }
+
         var code = GetQueryValue(e.Uri, "code");
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -88,6 +103,7 @@ public partial class PsnSignInWindow : Window
             return;
         }
 
+        _completed = true;
         _ = CompleteSignInAsync(code);
     }
 
@@ -95,24 +111,32 @@ public partial class PsnSignInWindow : Window
     {
         try
         {
+            StatusText.Text = "Exchanging Sony's sign-in code…";
+            var auth = await _lookup.ExchangeCodeAsync(code, _lifetime.Token);
             StatusText.Text = "Reading your PlayStation Network account…";
-            var accountId = await PsnAccountLookup.ExchangeCodeAsync(code, _lifetime.Token);
-            if (string.IsNullOrWhiteSpace(accountId))
+            if (string.IsNullOrWhiteSpace(auth.OnlineId))
             {
-                StatusText.Text = "PlayStation Network did not return an account ID.";
+                StatusText.Text = "Sony signed you in but did not return an Online ID. Try again.";
+                _completed = false;
                 return;
             }
 
-            AccountId = accountId;
+            Auth = auth;
             DialogResult = true;
         }
         catch (OperationCanceledException)
         {
             // window closed
         }
+        catch (AccountAuthException ex)
+        {
+            StatusText.Text = string.IsNullOrWhiteSpace(ex.Stage) ? ex.Message : $"{ex.Stage}: {ex.Message}";
+            _completed = false;
+        }
         catch (Exception ex)
         {
             StatusText.Text = ex.Message;
+            _completed = false;
         }
     }
 

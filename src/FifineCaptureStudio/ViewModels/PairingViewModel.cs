@@ -137,7 +137,8 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         PairingStage.Connected => "Connected · receiving video",
         PairingStage.Unsupported => "Unsupported connection method",
         PairingStage.Interrupted => "Connection interrupted",
-        _ => "Connection failed"
+        PairingStage.Failed => "Pairing failed",
+        _ => "Pairing failed"
     };
 
     public string StatusColor => Stage switch
@@ -382,15 +383,17 @@ public sealed class PairingViewModel : INotifyPropertyChanged
         {
             Stage = PairingStage.Authenticating;
             Status = "This PS5 needs a one-time PlayStation Network sign-in before it can accept the code…";
-            var accountId = PsnSignInWindow.PromptForAccountId();
-            if (string.IsNullOrWhiteSpace(accountId))
+            var signedIn = await _studio.SignInPlayStationAsync().ConfigureAwait(true);
+            if (!signedIn)
             {
                 Stage = PairingStage.Failed;
-                Status = "The PlayStation Network sign-in was cancelled. Press Connect to try again with a new code from the console.";
+                Status = "PlayStation Network sign-in did not complete: " +
+                         (_studio.PlayStationAccount.StatusText is { Length: > 0 } detail
+                             ? detail
+                             : "no account ID was returned.") +
+                         " Press Connect to try again with a new code from the console.";
                 return;
             }
-
-            _studio.PlayStationAccountId = accountId;
         }
 
         Stage = PairingStage.Authenticating;

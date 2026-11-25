@@ -210,9 +210,20 @@ PS5 ──Remote Play──▶ nixani-engine.exe ──stdio protocol v3──�
 * The engine is AGPL-3.0 and is bundled as a separate program under `<app>\streaming\`; its licence
   and upstream source offer are recorded in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). See
   [docs/CONSOLE-STREAMING.md](docs/CONSOLE-STREAMING.md).
-* A PS5 needs the PSN account ID during link-code registration. FIFINE offers a one-time
-  **Sign in to PSN** (Sony's own page in a WebView2 window) and keeps only the account ID; after
-  that, the pairing sheet asks for nothing but the 8-digit code shown on the TV.
+* A PS5 needs the PSN account ID during link-code registration. FIFINE offers **Sign in to Sony**
+  (Sony's own page in a WebView2 window), shows the returned Online ID, and keeps the account ID
+  plus DPAPI-protected OAuth tokens so the account can be restored after a restart. Signing out
+  clears only PlayStation; after sign-in, the pairing sheet asks for nothing but the 8-digit code
+  shown on the TV. A manually pasted PSN account ID remains available but is not treated as a
+  signed-in account.
+* **Platform accounts** (Gaming Sources) treats Xbox, PlayStation and PC independently. Xbox uses
+  Microsoft's device-code flow and Xbox Live/XSTS profile lookup, so it needs a Microsoft Entra app
+  registration client ID with public client flows enabled; the panel includes the setup steps and a
+  field for that public ID. No client secret is stored. The PC integration is the FIFINE Link Agent,
+  which pairs a device and exposes no account identity, so the PC account area says **Not available**
+  rather than inventing an identity.
+* Account authentication is separate from console discovery, pairing and streaming: a signed-in
+  account stays signed in when a console is offline, and a failed pairing never clears it.
 * Xbox home streaming is WebRTC-based and neither Greenlight nor xbox-xcloud-player can be embedded as
   a library, so no Xbox network video path is shipped; HDMI capture remains the Xbox path.
 

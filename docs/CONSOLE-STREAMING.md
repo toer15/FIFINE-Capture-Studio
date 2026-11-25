@@ -51,11 +51,20 @@ URL are in that folder and in `THIRD-PARTY-NOTICES.md`. No build or download is 
 looks at the app-data `streaming` folder and `PATH`.
 
 PS5 registration needs the PSN account ID (hex or base64) because the console ties the client to
-the account; PS4 does not. The field is in the same card, and **Sign in to PSN** fills it from Sony's
-own sign-in page in a WebView2 window; only the account ID is stored, never the password or OAuth
-token. Without it the PS5 rejects the link with `CE-110032-7` (invalid PSN ID), so FIFINE stops
-before sending an all-zero ID and says what to do. After the one-time sign-in, the pairing sheet
-only asks for the 8-digit code shown on the TV.
+the account; PS4 does not. **Gaming Sources → Platform accounts** has a PlayStation row; **Sign in
+with Sony** opens Sony's own page in a WebView2 window and displays the real **Online ID** returned
+for the account. The account ID and OAuth tokens are stored (tokens DPAPI-protected per Windows
+user), so a valid session is restored on the next launch and can be refreshed. Signing out clears
+only the PlayStation account and its tokens; a manually pasted PSN account ID remains possible but
+is not presented as a signed-in account. Without an account ID the PS5 rejects the link with
+`CE-110032-7` (invalid PSN ID), so FIFINE stops before sending an all-zero ID and says what to do.
+After sign-in, the pairing sheet only asks for the 8-digit code shown on the TV.
+
+The Xbox row uses Microsoft's device-code flow, then Xbox Live user/XSTS authentication and the
+profile service to show the actual Gamertag. Xbox Live requires a Microsoft Entra app registration
+client ID (public client flows enabled); the row contains the setup steps and accepts that public
+ID. The PC row is deliberately **Not available**: FIFINE Link Agent pairs a PC but has no account
+identity to authenticate.
 
 ## Xbox (not implemented)
 
@@ -65,8 +74,10 @@ programs whose video is rendered inside Chromium; there is no drop-in native lib
 
 This build therefore **does not** ship an Xbox video backend and does not pretend to: the Xbox
 pairing path still offers HDMI capture, and the UI states that no network video transport exists yet.
-Implementing it would require embedding a WebRTC stack plus the xHome signalling flow and a real
-console for verification.
+Implementing the video path would require embedding a WebRTC stack plus the xHome signalling flow and
+a real console for verification. Xbox **account** sign-in is separate and is implemented with
+Microsoft's device-code flow; it needs a Microsoft Entra app registration client ID supplied in the
+Xbox account panel.
 
 ## Verification performed
 
@@ -77,9 +88,10 @@ console for verification.
 | Decode through the named pipe | Real H.264 asset pushed through `VideoPipeFeed`; FFmpeg decoded it into an MP4 > 10 KB |
 | DPAPI credential storage | Round-trip test; wrong-user/corrupt blob returns null |
 | Real engine handshake | Bundled `nixani-engine.exe` 1.2.0 reports protocol 3, starts and answers `Hello`; discovery found the PS5 on this network |
-| PSN sign-in page | Sony's sign-in page loads in the app's WebView2 window; account-ID exchange requires a real PSN account and was not completed here |
+| PSN sign-in page | Sony's sign-in page loads in the app's WebView2 window. Token exchange and Online-ID retrieval require a real PSN account and were not completed here |
+| Account state transitions | 25 mocked tests: pending authorization, successful sign-in, actual Gamertag/Online ID display, restore, expiry, profile failure, independent sign-out, and PC unavailable |
 | Link-code and PSN account-id parsing | Unit tests |
-| UI | All ten views smoke-tested; PlayStation card added to Gaming Sources |
+| UI | All views smoke-tested, including the Platform accounts panel; PlayStation card added to Gaming Sources |
 
 **Not verified:** a physical PS5/PS4 has never been connected here (no console is attached to this
 machine). Protocol compliance is verified against the published specification, the mock engine and

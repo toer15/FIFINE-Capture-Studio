@@ -20,7 +20,7 @@
             <Grid Grid.Row="0" Background="#FF11182A" MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <StackPanel VerticalAlignment="Center" Margin="18,0,0,0">
                     <TextBlock Text="PlayStation Network" Foreground="White" FontSize="14" FontWeight="SemiBold" />
-                    <TextBlock Text="Sign in once so this PS5 can accept the 8-digit link code"
+                    <TextBlock Text="Sign in to see your Online ID and link this PS5"
                                Foreground="#FF8D98AC" FontSize="10.5" Margin="0,2,0,0" />
                 </StackPanel>
                 <Button Content="✕" Width="34" Height="30" HorizontalAlignment="Right" VerticalAlignment="Center"

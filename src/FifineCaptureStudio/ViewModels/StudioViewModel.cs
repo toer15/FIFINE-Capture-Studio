@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using FifineCaptureStudio.Capture;
 using FifineCaptureStudio.Core;
+using FifineCaptureStudio.Core.Accounts;
 
 namespace FifineCaptureStudio.ViewModels;
 
@@ -81,6 +82,7 @@ public sealed record NavItem(string Title, string IconKey, string Page)
 public sealed partial class StudioViewModel : ObservableObject
 {
     private readonly AppServices _services;
+    private readonly AccountManager _accounts;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _uiTimer;
     private readonly Stopwatch _sessionClock = Stopwatch.StartNew();
@@ -110,6 +112,7 @@ public sealed partial class StudioViewModel : ObservableObject
     public StudioViewModel(AppServices services)
     {
         _services = services;
+        _accounts = new AccountManager(services.Settings);
         _dispatcher = Dispatcher.CurrentDispatcher;
 
         // Restore the desktop state the user left behind, before anything binds to it.
@@ -989,6 +992,9 @@ public sealed partial class StudioViewModel : ObservableObject
         _uiTimer.Start();
         RaiseAllSettings();
         InitializeUpdates();
+
+        // Restore saved provider sessions in the background; device discovery and capture start independently.
+        _ = RestoreAccountsAsync();
     }
 
     private bool AutoStartSource()
